@@ -1,0 +1,15 @@
+---
+
+title: "Notice Title"
+copyright: "Notice Copyright"
+description: "Notice Description"
+reviewers: 
+  - reviewerOne
+search:
+  - "package.json"
+dependencies:
+  - "wix"
+devDependencies: 
+  - "webpack"
+
+...
