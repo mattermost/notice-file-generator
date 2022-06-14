@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+dist/
 
 # Test binary, built with `go test -c`
 *.test
@@ -14,5 +15,21 @@
 # Dependency directories (remove the comment below to include it)
  vendor/
 
-# IDE folders
-.vscode
+# Editors/IDEs
+*.swp
+*.swo
+*.vim
+.vscode/
+~
+
+# Intermediate folders
+-notice
+-notice-work
+
+# Critical files
+*.key
+*.pem
+*.crt
+*.cert
+*.gpg
+*.sig
