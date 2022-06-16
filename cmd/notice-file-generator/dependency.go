@@ -249,7 +249,7 @@ func PopulateJSDependencies(config *Config) ([]Dependency, error) {
 		}
 	}
 	for _, dependency := range config.Dependencies {
-		if IndexOf(dependencies, dependency) > -1 {
+		if IndexOf(dependencies, dependency) == -1 {
 			dependencies = append(dependencies, dependency)
 		}
 	}
