@@ -49,4 +49,4 @@ See [LICENSE.txt](LICENSE.txt) for license rights and limitations.
 
 ## Release
 
-Create tag with release version, pipelines will create a release for that tag.
+Create a tag for desired version, pipelines will create and publish the release.
