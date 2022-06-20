@@ -100,7 +100,7 @@ func SplitExistingNotice(config *Config) error {
 				writer = bufio.NewWriter(out)
 			}
 			if out != nil {
-				if strings.HasPrefix(line, "---") {
+				if line == "---" {
 					writer.Flush()
 					out.Close()
 					writer = nil
