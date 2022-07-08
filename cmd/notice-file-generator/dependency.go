@@ -48,6 +48,8 @@ var regexpGoImport = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)<\s*meta\s*content\s*=\s*"(?P<import_prefix>\S+)\s+(?P<vcs>\S+)\s+(?P<repo_root>\S+)"\s*name\s*=\s*"go-import"\s*/?>`),
 }
 
+var regexPythonRepo = regexp.MustCompile(`^#\s*[R|r]epo(sitory)*:\s*(?P<url>https:\/\/github.com\/(?P<full_name>.*\/(?P<name>.*)))`)
+
 type GoImport struct {
 	ImportPrefix string
 	Vcs          string
@@ -101,7 +103,7 @@ func (d *Dependency) NpmLoad() error {
 	return json.Unmarshal([]byte(data), &d)
 }
 
-func (d *Dependency) GoLoad(config *Config) error {
+func (d *Dependency) LoadFromGithub(config *Config) error {
 	if strings.Contains(d.Repository.URL, "github.com") {
 		repoDef := strings.Split(d.Repository.URL, "/")
 		scope := repoDef[len(repoDef)-2]
@@ -146,14 +148,16 @@ func (d *Dependency) Generate(config *Config) error {
 
 	if err := MoveExistingNotice(config, filename); err != nil {
 		log.Printf("Populate notice of %s", d.Name)
-		if config.IsJsRepo() {
+		switch config.RepoType {
+		case JsRepo:
 			if err = d.NpmLoad(); err != nil {
 				log.Printf("Npm load failed  %s", d.Name)
 				return err
 			}
-		} else if config.IsGoRepo() {
-			if err = d.GoLoad(config); err != nil {
-				log.Printf("Go load failed  %s", d.Name)
+		case GoRepo:
+		case PythonRepo:
+			if err = d.LoadFromGithub(config); err != nil {
+				log.Printf("GitHub load failed  %s", d.Name)
 				return err
 			}
 		}
@@ -346,12 +350,44 @@ func PopulateGoDependencies(config *Config) ([]Dependency, error) {
 	return dependencies, nil
 }
 
+func PopulatePythonDependencies(config *Config) ([]Dependency, error) {
+	dependencies := []Dependency{}
+	inFile, err := os.Open(config.Path + "/Pipfile")
+	if err != nil {
+		log.Fatalf("Invalid pipfile. %v", err)
+	}
+	defer inFile.Close()
+	scanner := bufio.NewScanner(inFile)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if regexPythonRepo.MatchString(line) {
+			matches := regexPythonRepo.FindStringSubmatch(line)
+			dependencies = append(dependencies, Dependency{
+				Name:     matches[regexPythonRepo.SubexpIndex("name")],
+				FullName: matches[regexPythonRepo.SubexpIndex("full_name")],
+				Repository: DependencyRepository{
+					Type: "https",
+					URL:  matches[regexPythonRepo.SubexpIndex("url")],
+				},
+			})
+		}
+	}
+	return dependencies, nil
+}
+
 func PopulateDependencies(config *Config) ([]Dependency, error) {
 
-	if config.IsJsRepo() {
+	if config.RepoType == JsRepo {
 		return PopulateJSDependencies(config)
-	} else if config.IsGoRepo() {
+	}
+
+	if config.RepoType == GoRepo {
 		return PopulateGoDependencies(config)
 	}
+
+	if config.RepoType == PythonRepo {
+		return PopulatePythonDependencies(config)
+	}
+
 	return []Dependency{}, nil
 }
