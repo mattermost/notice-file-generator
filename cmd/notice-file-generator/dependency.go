@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -48,6 +47,8 @@ var regexpGoImport = []*regexp.Regexp{
 	// source hut has the arguments the other way round
 	regexp.MustCompile(`(?i)<\s*meta\s*content\s*=\s*"(?P<import_prefix>\S+)\s+(?P<vcs>\S+)\s+(?P<repo_root>\S+)"\s*name\s*=\s*"go-import"\s*/?>`),
 }
+
+var regexPythonRepo = regexp.MustCompile(`^#\s*[R|r]epo(sitory)*:\s*(?P<url>https:\/\/github.com\/(?P<full_name>.*\/(?P<name>.*)))`)
 
 type GoImport struct {
 	ImportPrefix string
@@ -147,12 +148,14 @@ func (d *Dependency) Generate(config *Config) error {
 
 	if err := MoveExistingNotice(config, filename); err != nil {
 		log.Printf("Populate notice of %s", d.Name)
-		if config.IsJsRepo() {
+		switch config.RepoType {
+		case JsRepo:
 			if err = d.NpmLoad(); err != nil {
 				log.Printf("Npm load failed  %s", d.Name)
 				return err
 			}
-		} else if config.IsGoRepo() || config.IsPythonRepo() {
+		case GoRepo:
+		case PythonRepo:
 			if err = d.LoadFromGithub(config); err != nil {
 				log.Printf("GitHub load failed  %s", d.Name)
 				return err
@@ -357,18 +360,16 @@ func PopulatePythonDependencies(config *Config) ([]Dependency, error) {
 	scanner := bufio.NewScanner(inFile)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "# Repo:") {
-			repoURL := strings.Trim(strings.TrimPrefix(line, "# Repo:"), " ")
-			if strings.HasPrefix(repoURL, "https://github.com") {
-				dependencies = append(dependencies, Dependency{
-					Name:     path.Base(repoURL),
-					FullName: strings.TrimPrefix(repoURL, "https://github.com/"),
-					Repository: DependencyRepository{
-						Type: "https",
-						URL:  repoURL,
-					},
-				})
-			}
+		if regexPythonRepo.MatchString(line) {
+			matches := regexPythonRepo.FindStringSubmatch(line)
+			dependencies = append(dependencies, Dependency{
+				Name:     matches[regexPythonRepo.SubexpIndex("name")],
+				FullName: matches[regexPythonRepo.SubexpIndex("full_name")],
+				Repository: DependencyRepository{
+					Type: "https",
+					URL:  matches[regexPythonRepo.SubexpIndex("url")],
+				},
+			})
 		}
 	}
 	return dependencies, nil
@@ -376,12 +377,17 @@ func PopulatePythonDependencies(config *Config) ([]Dependency, error) {
 
 func PopulateDependencies(config *Config) ([]Dependency, error) {
 
-	if config.IsJsRepo() {
+	if config.RepoType == JsRepo {
 		return PopulateJSDependencies(config)
-	} else if config.IsGoRepo() {
+	}
+
+	if config.RepoType == GoRepo {
 		return PopulateGoDependencies(config)
-	} else if config.IsPythonRepo() {
+	}
+
+	if config.RepoType == PythonRepo {
 		return PopulatePythonDependencies(config)
 	}
+
 	return []Dependency{}, nil
 }

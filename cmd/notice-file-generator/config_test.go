@@ -21,11 +21,13 @@ func TestNoticeFilePath(t *testing.T) {
 	config := Config{Path: "/tmp/work"}
 	assert.Equal(t, "/tmp/work/NOTICE.txt", config.NoticeFilePath())
 }
-func TestIsJsRepo(t *testing.T) {
+func TestRepoType(t *testing.T) {
 	jsconfig := Config{Search: []string{"", "package.json"}}
 	goconfig := Config{Search: []string{"", "go.mod"}}
-	assert.True(t, jsconfig.IsJsRepo())
-	assert.False(t, goconfig.IsJsRepo())
+	pythonconfig := Config{Search: []string{"", "Pipfile"}}
+	assert.Equal(t, JsRepo, jsconfig.RepoType)
+	assert.Equal(t, GoRepo, goconfig.RepoType)
+	assert.Equal(t, PythonRepo, pythonconfig.RepoType)
 }
 
 func TestNewConfig(t *testing.T) {

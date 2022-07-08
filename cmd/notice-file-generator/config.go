@@ -10,6 +10,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type RepoType int
+
+const (
+	JsRepo RepoType = iota
+	GoRepo
+	PythonRepo
+)
+
 type Config struct {
 	Title           string   `yaml:"title"`
 	Copyright       string   `yaml:"copyright"`
@@ -21,6 +29,7 @@ type Config struct {
 	Name            string   `yaml:"-"`
 	Path            string   `yaml:"-"`
 	GHToken         string   `yaml:"-"`
+	RepoType        RepoType `yaml:"-"`
 }
 
 func (c *Config) NoticeDirPath() string {
@@ -33,36 +42,6 @@ func (c *Config) NoticeWorkPath() string {
 
 func (c *Config) NoticeFilePath() string {
 	return fmt.Sprintf("%s/NOTICE.txt", c.Path)
-}
-
-func (c *Config) IsJsRepo() bool {
-	for _, search := range c.Search {
-		if strings.Contains(search, "package.json") {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (c *Config) IsGoRepo() bool {
-	for _, search := range c.Search {
-		if strings.Contains(search, "go.mod") {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (c *Config) IsPythonRepo() bool {
-	for _, search := range c.Search {
-		if strings.Contains(search, "Pipfile") {
-			return true
-		}
-	}
-
-	return false
 }
 
 func newConfig() *Config {
@@ -90,6 +69,21 @@ func newConfig() *Config {
 	}
 	if err = yaml.Unmarshal(content, config); err != nil {
 		log.Fatalf("%s - Configuration file error! %v", *repositoryPath, err)
+	}
+
+	for _, search := range config.Search {
+		if strings.Contains(search, "package.json") {
+			config.RepoType = JsRepo
+			break
+		}
+		if strings.Contains(search, "go.mod") {
+			config.RepoType = GoRepo
+			break
+		}
+		if strings.Contains(search, "Pipfile") {
+			config.RepoType = PythonRepo
+			break
+		}
 	}
 
 	return config
