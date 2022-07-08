@@ -1,5 +1,5 @@
 # notice-file-generator
-Notice file generator Mattermost tool to automatically generate NOTICE file for Go and Node projects.
+Notice file generator Mattermost tool to automatically generate NOTICE file for Go, Node and Python projects.
 
 ## Get Involved
 

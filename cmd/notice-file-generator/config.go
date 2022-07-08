@@ -55,6 +55,16 @@ func (c *Config) IsGoRepo() bool {
 	return false
 }
 
+func (c *Config) IsPythonRepo() bool {
+	for _, search := range c.Search {
+		if strings.Contains(search, "Pipfile") {
+			return true
+		}
+	}
+
+	return false
+}
+
 func newConfig() *Config {
 	repositoryPath := flag.String("p", "", "Repository Path")
 	repositoryName := flag.String("n", "", "Name of the Repo")
