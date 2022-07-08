@@ -43,6 +43,22 @@ func (c *Config) NoticeWorkPath() string {
 func (c *Config) NoticeFilePath() string {
 	return fmt.Sprintf("%s/NOTICE.txt", c.Path)
 }
+func (c *Config) determineRepoType() {
+	for _, search := range c.Search {
+		if strings.Contains(search, "package.json") {
+			c.RepoType = JsRepo
+			break
+		}
+		if strings.Contains(search, "go.mod") {
+			c.RepoType = GoRepo
+			break
+		}
+		if strings.Contains(search, "Pipfile") {
+			c.RepoType = PythonRepo
+			break
+		}
+	}
+}
 
 func newConfig() *Config {
 	repositoryPath := flag.String("p", "", "Repository Path")
@@ -70,22 +86,7 @@ func newConfig() *Config {
 	if err = yaml.Unmarshal(content, config); err != nil {
 		log.Fatalf("%s - Configuration file error! %v", *repositoryPath, err)
 	}
-
-	for _, search := range config.Search {
-		if strings.Contains(search, "package.json") {
-			config.RepoType = JsRepo
-			break
-		}
-		if strings.Contains(search, "go.mod") {
-			config.RepoType = GoRepo
-			break
-		}
-		if strings.Contains(search, "Pipfile") {
-			config.RepoType = PythonRepo
-			break
-		}
-	}
-
+	config.determineRepoType()
 	return config
 
 }

@@ -25,6 +25,9 @@ func TestRepoType(t *testing.T) {
 	jsconfig := Config{Search: []string{"", "package.json"}}
 	goconfig := Config{Search: []string{"", "go.mod"}}
 	pythonconfig := Config{Search: []string{"", "Pipfile"}}
+	jsconfig.determineRepoType()
+	goconfig.determineRepoType()
+	pythonconfig.determineRepoType()
 	assert.Equal(t, JsRepo, jsconfig.RepoType)
 	assert.Equal(t, GoRepo, goconfig.RepoType)
 	assert.Equal(t, PythonRepo, pythonconfig.RepoType)
