@@ -155,6 +155,10 @@ func (d *Dependency) Generate(config *Config) error {
 				return err
 			}
 		case GoRepo:
+			if err = d.LoadFromGithub(config); err != nil {
+				log.Printf("GitHub load failed  %s", d.Name)
+				return err
+			}
 		case PythonRepo:
 			if err = d.LoadFromGithub(config); err != nil {
 				log.Printf("GitHub load failed  %s", d.Name)
