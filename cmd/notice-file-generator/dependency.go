@@ -105,16 +105,19 @@ func (d *Dependency) NpmLoad() error {
 
 func (d *Dependency) LoadFromGithub(config *Config) error {
 	if strings.Contains(d.Repository.URL, "github.com") {
+		var gh = github.NewClient(nil)
 		repoDef := strings.Split(d.Repository.URL, "/")
 		scope := repoDef[len(repoDef)-2]
 		repoName := strings.ReplaceAll(repoDef[len(repoDef)-1], ".git", "")
 
-		ctx := context.Background()
-		ts := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: config.GHToken},
-		)
-		tc := oauth2.NewClient(ctx, ts)
-		gh := github.NewClient(tc)
+		if len(config.GHToken) != 0 {
+			ctx := context.Background()
+			ts := oauth2.StaticTokenSource(
+				&oauth2.Token{AccessToken: config.GHToken},
+			)
+			tc := oauth2.NewClient(ctx, ts)
+			gh = github.NewClient(tc)
+		}
 
 		repo, _, err := gh.Repositories.Get(context.Background(), scope, repoName)
 		if err != nil {

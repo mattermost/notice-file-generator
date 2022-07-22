@@ -25,6 +25,7 @@ dist/
 # Intermediate folders
 -notice
 -notice-work
+.-notice/
 
 # Critical files
 *.key
