@@ -34,10 +34,9 @@ func TestRepoType(t *testing.T) {
 }
 
 func TestNewConfig(t *testing.T) {
-	os.Args = append(os.Args, "-n=test", "-p=/tmp/test", "-t=token", "-c=testdata/test.yaml")
+	os.Args = append(os.Args, "-p=/tmp/test", "-t=token", "-c=testdata/test.yaml")
 
 	config := newConfig()
-	assert.Equal(t, "test", config.Name)
 	assert.Equal(t, "/tmp/test", config.Path)
 	assert.Equal(t, "token", config.GHToken)
 	assert.Equal(t, "Notice Title", config.Title)
