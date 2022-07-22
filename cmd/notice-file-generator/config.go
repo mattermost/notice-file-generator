@@ -68,7 +68,7 @@ func newConfig() *Config {
 
 	flag.Parse()
 
-	if len(*repositoryPath) == 0 || len(*repositoryName) == 0 || len(*githubToken) == 0 || len(*configFilePath) == 0 {
+	if len(*repositoryPath) == 0 || len(*repositoryName) == 0 || len(*configFilePath) == 0 {
 		fmt.Println("Usage: main.go -n name -p path -t token -c configFile")
 		flag.PrintDefaults()
 		os.Exit(1)

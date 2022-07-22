@@ -31,8 +31,8 @@ Arguments:
 | :--  | :--      | :---------- |
 | Configuration File | -c <path_to_config_file> | Full path of the configuration file. |
 | Name | -n <project_name> | Name of the project, tool will create temporary folders by using project name.
-| Proejct Path | -p <project_path> | Full path of the project's root directory |
-| Github Token | -t <github_pat_token> | Dependency licences will be fetched from Github, token needed to remove API rate limits. |
+| Project Path | -p <project_path> | Full path of the project's root directory |
+| Github Token (optional) | -t <github_pat_token> | Dependency licences will be fetched from Github, token needed to remove API rate limits. |
 
 ### Testing
 
