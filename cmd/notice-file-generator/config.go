@@ -61,15 +61,14 @@ func (c *Config) determineRepoType() {
 }
 
 func newConfig() *Config {
-	repositoryPath := flag.String("p", "", "Repository Path")
-	repositoryName := flag.String("n", "", "Name of the Repo")
+	repositoryPath := flag.String("p", ".", "Repository Path")
 	githubToken := flag.String("t", "", "Github Authentication Token")
 	configFilePath := flag.String("c", "", "Configuration File Path")
 
 	flag.Parse()
 
-	if len(*repositoryPath) == 0 || len(*repositoryName) == 0 || len(*configFilePath) == 0 {
-		fmt.Println("Usage: main.go -n name -p path -t token -c configFile")
+	if len(*configFilePath) == 0 {
+		fmt.Println("Usage: main.go -p path -t token -c configFile")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
@@ -79,7 +78,6 @@ func newConfig() *Config {
 		log.Fatalf("%s - Configuration file error! %v", *repositoryPath, err)
 	}
 	config := &Config{
-		Name:    *repositoryName,
 		Path:    *repositoryPath,
 		GHToken: *githubToken,
 	}
