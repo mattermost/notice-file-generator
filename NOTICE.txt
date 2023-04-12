@@ -157,7 +157,7 @@ This product contains 'google/go-github' by Google.
 Go library for accessing the GitHub v3 API
 
 * HOMEPAGE:
-  * https://pkg.go.dev/github.com/google/go-github/v45/github
+  * https://pkg.go.dev/github.com/google/go-github/v51/github
 
 * LICENSE: BSD 3-Clause "New" or "Revised" License
 

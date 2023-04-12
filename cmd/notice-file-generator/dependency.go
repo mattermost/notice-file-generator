@@ -254,9 +254,7 @@ func PopulateJSDependencies(config *Config) ([]Dependency, error) {
 			dependencies = append(dependencies, dependency)
 		}
 		for dependency := range npmPack.DevDependencies {
-			if IndexOf(config.DevDependencies, dependency) > -1 {
-				dependencies = append(dependencies, dependency)
-			}
+			dependencies = append(dependencies, dependency)
 		}
 	}
 	for _, dependency := range config.Dependencies {
