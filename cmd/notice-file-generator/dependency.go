@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/bmatcuk/doublestar"
 	"github.com/google/go-github/github"
@@ -20,6 +21,17 @@ import (
 type NpmPackage struct {
 	Dependencies    map[string]string `json:"dependencies"`
 	DevDependencies map[string]string `json:"devDependencies"`
+}
+
+type Dependencies struct {
+	sync.Mutex
+	value []Dependency
+}
+
+func (deps *Dependencies) append(x Dependency) {
+	defer deps.Unlock()
+	deps.Lock()
+	deps.value = append(deps.value, x)
 }
 
 type Dependency struct {
@@ -136,12 +148,18 @@ func (d *Dependency) LoadFromGithub(config *Config) error {
 		}
 		d.Author = DependencyAuthor{Name: authorName}
 
-		if repo.Homepage != nil {
-			d.HomePage = *repo.Homepage
-		} else if repo.HTMLURL != nil {
-			d.HomePage = *repo.HTMLURL
+		if len(repo.GetHomepage()) == 0 {
+			d.HomePage = repo.GetHTMLURL()
+		} else {
+			d.HomePage = repo.GetHomepage()
 		}
-		d.License = *repo.License.Name
+
+		if repo.GetLicense() != nil {
+			d.License = *repo.License.Name
+		} else {
+			log.Printf("There is no licence available for %s", d.Name)
+		}
+
 	}
 	return nil
 }
@@ -151,23 +169,28 @@ func (d *Dependency) Generate(config *Config) error {
 
 	if err := MoveExistingNotice(config, filename); err != nil {
 		log.Printf("Populate notice of %s", d.Name)
-		switch config.RepoType {
-		case JsRepo:
-			if err = d.NpmLoad(); err != nil {
-				log.Printf("Npm load failed  %s", d.Name)
-				return err
-			}
-		case GoRepo:
-			if err = d.LoadFromGithub(config); err != nil {
-				log.Printf("GitHub load failed  %s", d.Name)
-				return err
-			}
-		case PythonRepo:
-			if err = d.LoadFromGithub(config); err != nil {
-				log.Printf("GitHub load failed  %s", d.Name)
-				return err
-			}
+		if err = d.LoadFromGithub(config); err != nil {
+			log.Printf("GitHub load failed  %s", d.Name)
+			return err
 		}
+
+		// switch config.RepoType {
+		// case JsRepo:
+		// 	if err = d.NpmLoad(); err != nil {
+		// 		log.Printf("Npm load failed  %s", d.Name)
+		// 		return err
+		// 	}
+		// case GoRepo:
+		// 	if err = d.LoadFromGithub(config); err != nil {
+		// 		log.Printf("GitHub load failed  %s", d.Name)
+		// 		return err
+		// 	}
+		// case PythonRepo:
+		// 	if err = d.LoadFromGithub(config); err != nil {
+		// 		log.Printf("GitHub load failed  %s", d.Name)
+		// 		return err
+		// 	}
+		// }
 
 		var out *os.File
 		var writer *bufio.Writer
@@ -288,9 +311,9 @@ func parseGoImport(data string) (GoImport, bool) {
 	return GoImport{}, false
 }
 
-func PopulateGoDependencies(config *Config) ([]Dependency, error) {
-	dependencies := []Dependency{}
-	dependencies = append(dependencies, Dependency{
+func PopulateGoDependencies(goModFile string) ([]Dependency, error) {
+	dependencies := Dependencies{}
+	dependencies.append(Dependency{
 		Name:        "Go",
 		FullName:    "github.com/golang/go",
 		HomePage:    "https://go.dev/",
@@ -302,57 +325,75 @@ func PopulateGoDependencies(config *Config) ([]Dependency, error) {
 			URL:  "github.com/golang/go",
 		},
 	})
-	o, _ := os.ReadFile(config.Path + "/go.mod")
+	o, e := os.ReadFile(goModFile)
+	if e != nil {
+		log.Fatalf("Could not read go.mod file at location %s . Error:  %v", goModFile, e)
+	}
 
 	f, err := modfile.Parse("go.mod", o, nil)
 	if err != nil {
 		log.Fatalf("Invalid go.mod file. %v", err)
 	}
+
+	var wg sync.WaitGroup
+
 	for _, r := range f.Require {
-		if !r.Indirect {
-			var data string
-			var ok bool
+		// go func(data []byte, atEOF bool) (advance int, token []byte, err error) {}
+		wg.Add(1)
+		r := r
+		go func() {
+			defer wg.Done()
 
-			data, err = HTTPGet(fmt.Sprintf("https://%s?go-get=1", r.Mod.Path))
-			if err != nil {
-				parts := strings.Split(r.Mod.Path, "/")
-				if len(parts) > 3 {
-					moduleroot := strings.Join(parts[:3], "/")
-					data, _ = HTTPGet(fmt.Sprintf("https://%s?go-get=1", moduleroot))
+			log.Printf("Pupulating %s go.mod dependency", r.Mod.String())
+			if !r.Indirect {
+				var data string
+				var ok bool
+
+				data, err = HTTPGet(fmt.Sprintf("https://%s?go-get=1", r.Mod.Path))
+				if err != nil {
+					parts := strings.Split(r.Mod.Path, "/")
+					if len(parts) > 3 {
+						moduleroot := strings.Join(parts[:3], "/")
+						data, _ = HTTPGet(fmt.Sprintf("https://%s?go-get=1", moduleroot))
+					}
+				}
+
+				gi, ok := parseGoImport(data)
+				if !ok {
+					log.Printf("unrecognised import %q (no go-import meta tags)", r.Mod.Path)
+				} else {
+					p := strings.Split(gi.ImportPrefix, "/")
+					name := gi.ImportPrefix
+					l := len(p)
+					if l >= 2 {
+						name = p[l-2] + "/" + p[l-1]
+					}
+					if strings.HasPrefix(gi.RepoRoot, "https://go.googlesource.com/") {
+						parts := strings.Split(gi.RepoRoot, "/")
+						gi.RepoRoot = fmt.Sprintf("https://github.com/golang/%s", parts[len(parts)-1])
+					} else if strings.HasPrefix(name, "gopkg.in") {
+						p := strings.Split(name, "/")
+						p = strings.Split(p[1], ".")
+						name = fmt.Sprintf("go-%s/%s", p[0], p[0])
+						gi.RepoRoot = "https://github.com/" + name
+					}
+					dependencies.append(Dependency{
+						Name:     name,
+						FullName: gi.ImportPrefix,
+						Repository: DependencyRepository{
+							Type: gi.Vcs,
+							URL:  gi.RepoRoot,
+						},
+					})
 				}
 			}
 
-			gi, ok := parseGoImport(data)
-			if !ok {
-				log.Printf("unrecognised import %q (no go-import meta tags)", r.Mod.Path)
-			} else {
-				p := strings.Split(gi.ImportPrefix, "/")
-				name := gi.ImportPrefix
-				l := len(p)
-				if l >= 2 {
-					name = p[l-2] + "/" + p[l-1]
-				}
-				if strings.HasPrefix(gi.RepoRoot, "https://go.googlesource.com/") {
-					parts := strings.Split(gi.RepoRoot, "/")
-					gi.RepoRoot = fmt.Sprintf("https://github.com/golang/%s", parts[len(parts)-1])
-				} else if strings.HasPrefix(name, "gopkg.in") {
-					p := strings.Split(name, "/")
-					p = strings.Split(p[1], ".")
-					name = fmt.Sprintf("go-%s/%s", p[0], p[0])
-					gi.RepoRoot = "https://github.com/" + name
-				}
-				dependencies = append(dependencies, Dependency{
-					Name:     name,
-					FullName: gi.ImportPrefix,
-					Repository: DependencyRepository{
-						Type: gi.Vcs,
-						URL:  gi.RepoRoot,
-					},
-				})
-			}
-		}
+		}()
 	}
-	return dependencies, nil
+
+	wg.Wait()
+
+	return dependencies.value, nil
 }
 
 func PopulatePythonDependencies(config *Config) ([]Dependency, error) {
@@ -381,18 +422,22 @@ func PopulatePythonDependencies(config *Config) ([]Dependency, error) {
 }
 
 func PopulateDependencies(config *Config) ([]Dependency, error) {
+	var deps []Dependency
+	// if config.RepoType == JsRepo {
+	// 	return PopulateJSDependencies(config)
+	// }
 
-	if config.RepoType == JsRepo {
-		return PopulateJSDependencies(config)
+	for _, modFile := range config.GoFiles {
+		d, err := PopulateGoDependencies(modFile)
+		if err != nil {
+			return deps, err
+		}
+		deps = append(deps, d...)
 	}
 
-	if config.RepoType == GoRepo {
-		return PopulateGoDependencies(config)
-	}
+	// if config.RepoType == PythonRepo {
+	// 	return PopulatePythonDependencies(config)
+	// }
 
-	if config.RepoType == PythonRepo {
-		return PopulatePythonDependencies(config)
-	}
-
-	return []Dependency{}, nil
+	return deps, nil
 }

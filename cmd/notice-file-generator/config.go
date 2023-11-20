@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -30,33 +31,35 @@ type Config struct {
 	Path            string   `yaml:"-"`
 	GHToken         string   `yaml:"-"`
 	RepoType        RepoType `yaml:"-"`
+	GoFiles         []string `yaml:"-"`
+	JSFIles         []string `yaml:"-"`
 }
 
 func (c *Config) NoticeDirPath() string {
-	return fmt.Sprintf("%s-notice", c.Path)
+	return fmt.Sprintf("%s/.notice", c.Path)
 }
 
 func (c *Config) NoticeWorkPath() string {
-	return fmt.Sprintf("%s-notice-work", c.Path)
+	return fmt.Sprintf("%s/.notice-work", c.Path)
 }
 
 func (c *Config) NoticeFilePath() string {
 	return fmt.Sprintf("%s/NOTICE.txt", c.Path)
 }
+
 func (c *Config) determineRepoType() {
 	for _, search := range c.Search {
-		if strings.Contains(search, "package.json") {
-			c.RepoType = JsRepo
-			break
-		}
+		// if strings.Contains(search, "package.json") {
+		// 	c.RepoType = JsRepo
+		// }
 		if strings.Contains(search, "go.mod") {
-			c.RepoType = GoRepo
-			break
+			goFile, _ := filepath.Abs(filepath.Join(c.Path, search))
+			c.GoFiles = append(c.GoFiles, goFile)
 		}
-		if strings.Contains(search, "Pipfile") {
-			c.RepoType = PythonRepo
-			break
-		}
+		// if strings.Contains(search, "Pipfile") {
+		// 	c.RepoType = PythonRepo
+		// 	break
+		// }
 	}
 }
 
@@ -67,7 +70,7 @@ func newConfig() *Config {
 
 	flag.Parse()
 
-	if len(*configFilePath) == 0 {
+	if len(*configFilePath) == 0 || len(*repositoryPath) == 0 {
 		fmt.Println("Usage: main.go -p path -t token -c configFile")
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -77,13 +80,17 @@ func newConfig() *Config {
 	if err != nil {
 		log.Fatalf("%s - Configuration file error! %v", *repositoryPath, err)
 	}
+	// Path always exist, no need to check error
+	repoFullPath, _ := filepath.Abs(*repositoryPath)
 	config := &Config{
-		Path:    *repositoryPath,
+		Path:    repoFullPath,
 		GHToken: *githubToken,
 	}
+
 	if err = yaml.Unmarshal(content, config); err != nil {
 		log.Fatalf("%s - Configuration file error! %v", *repositoryPath, err)
 	}
+
 	config.determineRepoType()
 	return config
 
