@@ -263,7 +263,6 @@ func (d *Dependency) Load(config *Config) string {
 }
 
 func (c *Config) PopulateJSDependencies(packageJSON string) ([]Dependency, error) {
-	var dependencies []string
 
 	o, err := os.ReadFile(packageJSON)
 	if err != nil {
@@ -275,23 +274,19 @@ func (c *Config) PopulateJSDependencies(packageJSON string) ([]Dependency, error
 		log.Fatalf("%s-Invalid package json %v", packageJSON, err)
 	}
 
+	var npmDependencies Dependencies
+
 	for dependency := range npmPack.Dependencies {
-		dependencies = append(dependencies, dependency)
+		npmDependencies.append(Dependency{Name: dependency, DependencyType: JsDep})
 	}
 
 	if c.IncludeDevDependencies {
 		for dependency := range npmPack.DevDependencies {
-			dependencies = append(dependencies, dependency)
+			npmDependencies.append(Dependency{Name: dependency, DependencyType: JsDep})
 		}
 	}
 
-	deps := []Dependency{}
-
-	for _, dependency := range dependencies {
-		deps = append(deps, Dependency{Name: dependency, DependencyType: JsDep})
-	}
-
-	return deps, nil
+	return npmDependencies.value, nil
 }
 
 func parseGoImport(data string) (GoImport, bool) {
@@ -313,8 +308,9 @@ func parseGoImport(data string) (GoImport, bool) {
 }
 
 func (c *Config) PopulateGoDependencies(goModFile string) ([]Dependency, error) {
-	dependencies := Dependencies{}
-	dependencies.append(Dependency{
+	var goDependencies Dependencies
+
+	goDependencies.append(Dependency{
 		Name:           "Go",
 		FullName:       "github.com/golang/go",
 		HomePage:       "https://go.dev/",
@@ -379,7 +375,7 @@ func (c *Config) PopulateGoDependencies(goModFile string) ([]Dependency, error) 
 						name = fmt.Sprintf("go-%s/%s", p[0], p[0])
 						gi.RepoRoot = "https://github.com/" + name
 					}
-					dependencies.append(Dependency{
+					goDependencies.append(Dependency{
 						Name:           name,
 						FullName:       gi.ImportPrefix,
 						DependencyType: GoDep,
@@ -395,27 +391,27 @@ func (c *Config) PopulateGoDependencies(goModFile string) ([]Dependency, error) 
 
 	wg.Wait()
 
-	return dependencies.value, nil
+	return goDependencies.value, nil
 }
 
 func PopulateDependencies(config *Config) ([]Dependency, error) {
-	var deps []Dependency
+	var allDeps []Dependency
 
 	for _, modFile := range config.GoFiles {
 		d, err := config.PopulateGoDependencies(modFile)
 		if err != nil {
-			return deps, err
+			return allDeps, err
 		}
-		deps = append(deps, d...)
+		allDeps = append(allDeps, d...)
 	}
 
 	for _, jsFile := range config.JSFIles {
 		d, err := config.PopulateJSDependencies(jsFile)
 		if err != nil {
-			return deps, err
+			return allDeps, err
 		}
-		deps = append(deps, d...)
+		allDeps = append(allDeps, d...)
 	}
 
-	return deps, nil
+	return allDeps, nil
 }
