@@ -12,18 +12,17 @@ import (
 )
 
 type Config struct {
-	Title           string   `yaml:"title"`
-	Copyright       string   `yaml:"copyright"`
-	Description     string   `yaml:"description"`
-	Reviewers       []string `yaml:"reviewers"`
-	Search          []string `yaml:"search"`
-	Dependencies    []string `yaml:"dependencies"`
-	DevDependencies []string `yaml:"devDependencies"`
-	Name            string   `yaml:"-"`
-	Path            string   `yaml:"-"`
-	GHToken         string   `yaml:"-"`
-	GoFiles         []string `yaml:"-"`
-	JSFIles         []string `yaml:"-"`
+	Title                  string   `yaml:"title"`
+	Copyright              string   `yaml:"copyright"`
+	Description            string   `yaml:"description"`
+	Reviewers              []string `yaml:"reviewers"`
+	Search                 []string `yaml:"search"`
+	IncludeDevDependencies bool     `yaml:"includeDevDependencies"`
+	Name                   string   `yaml:"-"`
+	Path                   string   `yaml:"-"`
+	GHToken                string   `yaml:"-"`
+	GoFiles                []string `yaml:"-"`
+	JSFIles                []string `yaml:"-"`
 }
 
 func (c *Config) NoticeDirPath() string {
@@ -40,18 +39,17 @@ func (c *Config) NoticeFilePath() string {
 
 func (c *Config) determineRepoFiles() {
 	for _, search := range c.Search {
+
 		if strings.Contains(search, "package.json") {
 			JSFile, _ := filepath.Abs(filepath.Join(c.Path, search))
 			c.JSFIles = append(c.JSFIles, JSFile)
 		}
+
 		if strings.Contains(search, "go.mod") {
 			goFile, _ := filepath.Abs(filepath.Join(c.Path, search))
 			c.GoFiles = append(c.GoFiles, goFile)
 		}
-		// if strings.Contains(search, "Pipfile") {
-		// 	c.DependencyType = PythonDep
-		// 	break
-		// }
+
 	}
 }
 

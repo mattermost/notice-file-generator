@@ -21,7 +21,6 @@ type DependencyType int
 const (
 	JsDep DependencyType = iota
 	GoDep
-	PythonDep
 )
 
 type NpmPackage struct {
@@ -207,11 +206,6 @@ func (d *Dependency) Generate(config *Config) error {
 				log.Printf("GitHub load failed  %s", d.Name)
 				return err
 			}
-			// case PythonDep:
-			// 	if err = d.LoadFromGithub(config); err != nil {
-			// 		log.Printf("GitHub load failed  %s", d.Name)
-			// 		return err
-			// 	}
 		}
 
 		var out *os.File
@@ -268,7 +262,7 @@ func (d *Dependency) Load(config *Config) string {
 	return string(c)
 }
 
-func PopulateJSDependencies(packageJSON string) ([]Dependency, error) {
+func (c *Config) PopulateJSDependencies(packageJSON string) ([]Dependency, error) {
 	var dependencies []string
 
 	o, err := os.ReadFile(packageJSON)
@@ -284,19 +278,19 @@ func PopulateJSDependencies(packageJSON string) ([]Dependency, error) {
 	for dependency := range npmPack.Dependencies {
 		dependencies = append(dependencies, dependency)
 	}
-	for dependency := range npmPack.DevDependencies {
-		dependencies = append(dependencies, dependency)
+
+	if c.IncludeDevDependencies {
+		for dependency := range npmPack.DevDependencies {
+			dependencies = append(dependencies, dependency)
+		}
 	}
-	// for _, dependency := range config.Dependencies {
-	// 	if IndexOf(dependencies, dependency) == -1 {
-	// 		dependencies = append(dependencies, dependency)
-	// 	}
-	// }
+
 	deps := []Dependency{}
 
 	for _, dependency := range dependencies {
 		deps = append(deps, Dependency{Name: dependency, DependencyType: JsDep})
 	}
+
 	return deps, nil
 }
 
@@ -318,7 +312,7 @@ func parseGoImport(data string) (GoImport, bool) {
 	return GoImport{}, false
 }
 
-func PopulateGoDependencies(goModFile string) ([]Dependency, error) {
+func (c *Config) PopulateGoDependencies(goModFile string) ([]Dependency, error) {
 	dependencies := Dependencies{}
 	dependencies.append(Dependency{
 		Name:           "Go",
@@ -404,36 +398,11 @@ func PopulateGoDependencies(goModFile string) ([]Dependency, error) {
 	return dependencies.value, nil
 }
 
-func PopulatePythonDependencies(config *Config) ([]Dependency, error) {
-	dependencies := []Dependency{}
-	inFile, err := os.Open(config.Path + "/Pipfile")
-	if err != nil {
-		log.Fatalf("Invalid pipfile. %v", err)
-	}
-	defer inFile.Close()
-	scanner := bufio.NewScanner(inFile)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if regexPythonDep.MatchString(line) {
-			matches := regexPythonDep.FindStringSubmatch(line)
-			dependencies = append(dependencies, Dependency{
-				Name:     matches[regexPythonDep.SubexpIndex("name")],
-				FullName: matches[regexPythonDep.SubexpIndex("full_name")],
-				Repository: DependencyRepository{
-					Type: "https",
-					URL:  matches[regexPythonDep.SubexpIndex("url")],
-				},
-			})
-		}
-	}
-	return dependencies, nil
-}
-
 func PopulateDependencies(config *Config) ([]Dependency, error) {
 	var deps []Dependency
 
 	for _, modFile := range config.GoFiles {
-		d, err := PopulateGoDependencies(modFile)
+		d, err := config.PopulateGoDependencies(modFile)
 		if err != nil {
 			return deps, err
 		}
@@ -441,16 +410,12 @@ func PopulateDependencies(config *Config) ([]Dependency, error) {
 	}
 
 	for _, jsFile := range config.JSFIles {
-		d, err := PopulateJSDependencies(jsFile)
+		d, err := config.PopulateJSDependencies(jsFile)
 		if err != nil {
 			return deps, err
 		}
 		deps = append(deps, d...)
 	}
-
-	// if config.DependencyType == PythonDep {
-	// 	return PopulatePythonDependencies(config)
-	// }
 
 	return deps, nil
 }
