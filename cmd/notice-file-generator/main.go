@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"sync"
 )
 
 func IndexOf[T comparable](collection []T, el T) int {
@@ -68,11 +69,22 @@ func main() {
 	if err = CreateNoticeDir(config); err != nil {
 		log.Fatalf("Error occured while creating work folder %s:%v", config.Name, err)
 	}
+
+	var wg sync.WaitGroup
+
 	for _, d := range dependencies {
-		if err = d.Generate(config); err != nil {
-			log.Printf("Error occured while generating notice.txt %s:%v", d.Name, err)
-		}
+		wg.Add(1)
+		d := d
+		go func() {
+			defer wg.Done()
+
+			if err = d.Generate(config); err != nil {
+				log.Printf("Error occured while generating notice.txt %s:%v", d.Name, err)
+			}
+
+		}()
 	}
+
 	if err = UpdateNotice(config, dependencies); err != nil {
 		log.Fatalf("Error occured while updating notice.txt %s:%v", config.Name, err)
 	}
