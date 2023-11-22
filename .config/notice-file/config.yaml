@@ -1,11 +1,6 @@
 ---
-
 title: "Mattermost Notice File Generator"
 copyright: "©2022 Mattermost, Inc.  All Rights Reserved.  See LICENSE.txt for license information."
 description: "This document includes a list of open source components used in Mattermost Motice File Generator, including those that have been modified."
 search:
   - "go.mod"
-dependencies: []
-devDependencies: []
-
-...

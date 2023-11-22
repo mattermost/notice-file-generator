@@ -17,11 +17,10 @@ dependencies: []
 devDependencies: []
 ```
 
-| Field | Type   | Purpose |
-| :--   | :--    | :--     |
-| title | string | Field content will be used as a title of the application. See first line of `NOTICE.txt` file. |
-| copyright | string | Field content will be used as a copyright message. See second line of `NOTICE.txt` file. |
-| description | string | Field content will be used as notice file description. See third line of `NOTICE.txt` file. |
-| dependencies | array | If any dependency name mentioned, it will be automatically added even if it is not a first-level dependency. |
-| devDependencies | array | If any dependency name mentioned, it will be added when it is referenced in devDependency section. |
-| search | array | Pipeline will search for package.json files mentioned here. Globstar format is supported ie. `packages/**/package.json`. |
+| Field                  | Type    | Purpose                                                                                                                  |
+| :--------------------- | :------ | :----------------------------------------------------------------------------------------------------------------------- |
+| title                  | string  | Field content will be used as a title of the application. See first line of `NOTICE.txt` file.                           |
+| copyright              | string  | Field content will be used as a copyright message. See second line of `NOTICE.txt` file.                                 |
+| description            | string  | Field content will be used as notice file description. See third line of `NOTICE.txt` file.                              |
+| includeDevDependencies | boolean | If true we include devDependency section of all package.json files declared.                                             |
+| search                 | array   | Pipeline will search for package.json files mentioned here. Globstar format is supported ie. `packages/**/package.json`. |

@@ -66,7 +66,7 @@ var regexpGoImport = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)<\s*meta\s*content\s*=\s*"(?P<import_prefix>\S+)\s+(?P<vcs>\S+)\s+(?P<repo_root>\S+)"\s*name\s*=\s*"go-import"\s*/?>`),
 }
 
-var regexPythonDep = regexp.MustCompile(`^#\s*[R|r]epo(sitory)*:\s*(?P<url>https:\/\/github.com\/(?P<full_name>.*\/(?P<name>.*)))`)
+// var regexPythonDep = regexp.MustCompile(`^#\s*[R|r]epo(sitory)*:\s*(?P<url>https:\/\/github.com\/(?P<full_name>.*\/(?P<name>.*)))`)
 
 type GoImport struct {
 	ImportPrefix string
@@ -132,9 +132,8 @@ func (d *Dependency) NpmLoad() error {
 				}
 			}
 			return nil
-		} else {
-			return err
 		}
+		return err
 
 	}
 
