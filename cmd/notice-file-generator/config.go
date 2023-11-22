@@ -11,14 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type RepoType int
-
-const (
-	JsRepo RepoType = iota
-	GoRepo
-	PythonRepo
-)
-
 type Config struct {
 	Title           string   `yaml:"title"`
 	Copyright       string   `yaml:"copyright"`
@@ -30,7 +22,6 @@ type Config struct {
 	Name            string   `yaml:"-"`
 	Path            string   `yaml:"-"`
 	GHToken         string   `yaml:"-"`
-	RepoType        RepoType `yaml:"-"`
 	GoFiles         []string `yaml:"-"`
 	JSFIles         []string `yaml:"-"`
 }
@@ -47,17 +38,18 @@ func (c *Config) NoticeFilePath() string {
 	return fmt.Sprintf("%s/NOTICE.txt", c.Path)
 }
 
-func (c *Config) determineRepoType() {
+func (c *Config) determineRepoFiles() {
 	for _, search := range c.Search {
-		// if strings.Contains(search, "package.json") {
-		// 	c.RepoType = JsRepo
-		// }
+		if strings.Contains(search, "package.json") {
+			JSFile, _ := filepath.Abs(filepath.Join(c.Path, search))
+			c.JSFIles = append(c.JSFIles, JSFile)
+		}
 		if strings.Contains(search, "go.mod") {
 			goFile, _ := filepath.Abs(filepath.Join(c.Path, search))
 			c.GoFiles = append(c.GoFiles, goFile)
 		}
 		// if strings.Contains(search, "Pipfile") {
-		// 	c.RepoType = PythonRepo
+		// 	c.DependencyType = PythonDep
 		// 	break
 		// }
 	}
@@ -91,7 +83,7 @@ func newConfig() *Config {
 		log.Fatalf("%s - Configuration file error! %v", *repositoryPath, err)
 	}
 
-	config.determineRepoType()
+	config.determineRepoFiles()
 	return config
 
 }

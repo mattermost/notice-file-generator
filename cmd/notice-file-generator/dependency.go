@@ -7,15 +7,21 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
 
-	"github.com/bmatcuk/doublestar"
 	"github.com/google/go-github/github"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/oauth2"
+)
+
+type DependencyType int
+
+const (
+	JsDep DependencyType = iota
+	GoDep
+	PythonDep
 )
 
 type NpmPackage struct {
@@ -35,13 +41,14 @@ func (deps *Dependencies) append(x Dependency) {
 }
 
 type Dependency struct {
-	Name        string               `json:"name"`
-	FullName    string               `json:"-"`
-	Description string               `json:"description"`
-	Author      DependencyAuthor     `json:"author"`
-	License     string               `json:"license"`
-	Repository  DependencyRepository `json:"repository"`
-	HomePage    string               `json:"homepage"`
+	Name           string               `json:"name"`
+	FullName       string               `json:"-"`
+	Description    string               `json:"description"`
+	Author         DependencyAuthor     `json:"author"`
+	License        string               `json:"license"`
+	Repository     DependencyRepository `json:"repository"`
+	HomePage       string               `json:"homepage"`
+	DependencyType DependencyType       `json:"-"`
 }
 
 type DependencyRepository struct {
@@ -60,7 +67,7 @@ var regexpGoImport = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)<\s*meta\s*content\s*=\s*"(?P<import_prefix>\S+)\s+(?P<vcs>\S+)\s+(?P<repo_root>\S+)"\s*name\s*=\s*"go-import"\s*/?>`),
 }
 
-var regexPythonRepo = regexp.MustCompile(`^#\s*[R|r]epo(sitory)*:\s*(?P<url>https:\/\/github.com\/(?P<full_name>.*\/(?P<name>.*)))`)
+var regexPythonDep = regexp.MustCompile(`^#\s*[R|r]epo(sitory)*:\s*(?P<url>https:\/\/github.com\/(?P<full_name>.*\/(?P<name>.*)))`)
 
 type GoImport struct {
 	ImportPrefix string
@@ -105,11 +112,31 @@ func (d *Dependency) PopulateLicence() string {
 }
 
 func (d *Dependency) NpmLoad() error {
-	log.Printf("Load %s information by npm", d.Name)
 	data, err := HTTPGet("https://registry.npmjs.org/" + d.Name)
 
 	if err != nil {
 		return err
+	}
+
+	if err := json.Unmarshal([]byte(data), &d); err != nil {
+		if ue, ok := err.(*json.UnmarshalTypeError); ok {
+			switch ue.Field {
+			case "Author":
+				d.Author = DependencyAuthor{
+					Name:  ue.Value,
+					Email: "",
+				}
+			case "Repository":
+				d.Repository = DependencyRepository{
+					Type: "",
+					URL:  ue.Value,
+				}
+			}
+			return nil
+		} else {
+			return err
+		}
+
 	}
 
 	return json.Unmarshal([]byte(data), &d)
@@ -155,11 +182,10 @@ func (d *Dependency) LoadFromGithub(config *Config) error {
 		}
 
 		if repo.GetLicense() != nil {
-			d.License = *repo.License.Name
+			d.License = repo.License.GetName()
 		} else {
 			log.Printf("There is no licence available for %s", d.Name)
 		}
-
 	}
 	return nil
 }
@@ -168,29 +194,25 @@ func (d *Dependency) Generate(config *Config) error {
 	filename := GenerateFileName(d.Name)
 
 	if err := MoveExistingNotice(config, filename); err != nil {
-		log.Printf("Populate notice of %s", d.Name)
-		if err = d.LoadFromGithub(config); err != nil {
-			log.Printf("GitHub load failed  %s", d.Name)
-			return err
+		switch d.DependencyType {
+		case JsDep:
+			log.Printf("Generating notice for %s npm dependency from NPM registry", d.Name)
+			if err = d.NpmLoad(); err != nil {
+				log.Printf("NPM load failed  %s", d.Name)
+				return err
+			}
+		case GoDep:
+			log.Printf("Generating notice for %s go.mod dependency from Github", d.Name)
+			if err = d.LoadFromGithub(config); err != nil {
+				log.Printf("GitHub load failed  %s", d.Name)
+				return err
+			}
+			// case PythonDep:
+			// 	if err = d.LoadFromGithub(config); err != nil {
+			// 		log.Printf("GitHub load failed  %s", d.Name)
+			// 		return err
+			// 	}
 		}
-
-		// switch config.RepoType {
-		// case JsRepo:
-		// 	if err = d.NpmLoad(); err != nil {
-		// 		log.Printf("Npm load failed  %s", d.Name)
-		// 		return err
-		// 	}
-		// case GoRepo:
-		// 	if err = d.LoadFromGithub(config); err != nil {
-		// 		log.Printf("GitHub load failed  %s", d.Name)
-		// 		return err
-		// 	}
-		// case PythonRepo:
-		// 	if err = d.LoadFromGithub(config); err != nil {
-		// 		log.Printf("GitHub load failed  %s", d.Name)
-		// 		return err
-		// 	}
-		// }
 
 		var out *os.File
 		var writer *bufio.Writer
@@ -235,7 +257,7 @@ func (d *Dependency) Generate(config *Config) error {
 		out.Close()
 
 	} else {
-		log.Printf("%s: Using existing notice txt.", d.Name)
+		log.Printf("Using existing notice for %s dependency", d.Name)
 	}
 	return nil
 }
@@ -246,49 +268,34 @@ func (d *Dependency) Load(config *Config) string {
 	return string(c)
 }
 
-func PopulateJSDependencies(config *Config) ([]Dependency, error) {
+func PopulateJSDependencies(packageJSON string) ([]Dependency, error) {
 	var dependencies []string
-	var packageJsons []string
 
-	for _, searchPath := range config.Search {
-		if strings.Contains(searchPath, "*") {
-			matches, err := doublestar.Glob(filepath.Join(config.Path, searchPath))
-			if err != nil {
-				log.Printf("Failed to find any package.json for %s", searchPath)
-			} else {
-				packageJsons = append(packageJsons, matches...)
-			}
-		} else {
-			packageJsons = append(packageJsons, fmt.Sprintf("%s/%s", config.Path, searchPath))
-		}
+	o, err := os.ReadFile(packageJSON)
+	if err != nil {
+		log.Fatalf("%s-Invalid package json %v", packageJSON, err)
 	}
-	for _, packageJSON := range packageJsons {
-		o, err := os.ReadFile(packageJSON)
-		if err != nil {
-			log.Fatalf("%s-Invalid package json %v", packageJSON, err)
-		}
-		var npmPack NpmPackage
+	var npmPack NpmPackage
 
-		if err := json.Unmarshal(o, &npmPack); err != nil {
-			log.Fatalf("%s-Invalid package json %v", packageJSON, err)
-		}
+	if err := json.Unmarshal(o, &npmPack); err != nil {
+		log.Fatalf("%s-Invalid package json %v", packageJSON, err)
+	}
 
-		for dependency := range npmPack.Dependencies {
-			dependencies = append(dependencies, dependency)
-		}
-		for dependency := range npmPack.DevDependencies {
-			dependencies = append(dependencies, dependency)
-		}
+	for dependency := range npmPack.Dependencies {
+		dependencies = append(dependencies, dependency)
 	}
-	for _, dependency := range config.Dependencies {
-		if IndexOf(dependencies, dependency) == -1 {
-			dependencies = append(dependencies, dependency)
-		}
+	for dependency := range npmPack.DevDependencies {
+		dependencies = append(dependencies, dependency)
 	}
+	// for _, dependency := range config.Dependencies {
+	// 	if IndexOf(dependencies, dependency) == -1 {
+	// 		dependencies = append(dependencies, dependency)
+	// 	}
+	// }
 	deps := []Dependency{}
 
 	for _, dependency := range dependencies {
-		deps = append(deps, Dependency{Name: dependency})
+		deps = append(deps, Dependency{Name: dependency, DependencyType: JsDep})
 	}
 	return deps, nil
 }
@@ -314,12 +321,13 @@ func parseGoImport(data string) (GoImport, bool) {
 func PopulateGoDependencies(goModFile string) ([]Dependency, error) {
 	dependencies := Dependencies{}
 	dependencies.append(Dependency{
-		Name:        "Go",
-		FullName:    "github.com/golang/go",
-		HomePage:    "https://go.dev/",
-		Description: "The Go programming language",
-		Author:      DependencyAuthor{Name: "The Go authors"},
-		License:     "BSD-style",
+		Name:           "Go",
+		FullName:       "github.com/golang/go",
+		HomePage:       "https://go.dev/",
+		Description:    "The Go programming language",
+		Author:         DependencyAuthor{Name: "The Go authors"},
+		License:        "BSD-style",
+		DependencyType: GoDep,
 		Repository: DependencyRepository{
 			Type: "git",
 			URL:  "github.com/golang/go",
@@ -338,13 +346,13 @@ func PopulateGoDependencies(goModFile string) ([]Dependency, error) {
 	var wg sync.WaitGroup
 
 	for _, r := range f.Require {
-		// go func(data []byte, atEOF bool) (advance int, token []byte, err error) {}
 		wg.Add(1)
 		r := r
+
 		go func() {
 			defer wg.Done()
 
-			log.Printf("Pupulating %s go.mod dependency", r.Mod.String())
+			log.Printf("Populating %s go.mod dependency", r.Mod.String())
 			if !r.Indirect {
 				var data string
 				var ok bool
@@ -378,8 +386,9 @@ func PopulateGoDependencies(goModFile string) ([]Dependency, error) {
 						gi.RepoRoot = "https://github.com/" + name
 					}
 					dependencies.append(Dependency{
-						Name:     name,
-						FullName: gi.ImportPrefix,
+						Name:           name,
+						FullName:       gi.ImportPrefix,
+						DependencyType: GoDep,
 						Repository: DependencyRepository{
 							Type: gi.Vcs,
 							URL:  gi.RepoRoot,
@@ -387,7 +396,6 @@ func PopulateGoDependencies(goModFile string) ([]Dependency, error) {
 					})
 				}
 			}
-
 		}()
 	}
 
@@ -406,14 +414,14 @@ func PopulatePythonDependencies(config *Config) ([]Dependency, error) {
 	scanner := bufio.NewScanner(inFile)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if regexPythonRepo.MatchString(line) {
-			matches := regexPythonRepo.FindStringSubmatch(line)
+		if regexPythonDep.MatchString(line) {
+			matches := regexPythonDep.FindStringSubmatch(line)
 			dependencies = append(dependencies, Dependency{
-				Name:     matches[regexPythonRepo.SubexpIndex("name")],
-				FullName: matches[regexPythonRepo.SubexpIndex("full_name")],
+				Name:     matches[regexPythonDep.SubexpIndex("name")],
+				FullName: matches[regexPythonDep.SubexpIndex("full_name")],
 				Repository: DependencyRepository{
 					Type: "https",
-					URL:  matches[regexPythonRepo.SubexpIndex("url")],
+					URL:  matches[regexPythonDep.SubexpIndex("url")],
 				},
 			})
 		}
@@ -423,9 +431,6 @@ func PopulatePythonDependencies(config *Config) ([]Dependency, error) {
 
 func PopulateDependencies(config *Config) ([]Dependency, error) {
 	var deps []Dependency
-	// if config.RepoType == JsRepo {
-	// 	return PopulateJSDependencies(config)
-	// }
 
 	for _, modFile := range config.GoFiles {
 		d, err := PopulateGoDependencies(modFile)
@@ -435,7 +440,15 @@ func PopulateDependencies(config *Config) ([]Dependency, error) {
 		deps = append(deps, d...)
 	}
 
-	// if config.RepoType == PythonRepo {
+	for _, jsFile := range config.JSFIles {
+		d, err := PopulateJSDependencies(jsFile)
+		if err != nil {
+			return deps, err
+		}
+		deps = append(deps, d...)
+	}
+
+	// if config.DependencyType == PythonDep {
 	// 	return PopulatePythonDependencies(config)
 	// }
 

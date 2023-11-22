@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,28 +10,28 @@ import (
 
 func TestNoticeDirPath(t *testing.T) {
 	config := Config{Path: "/tmp/work"}
-	assert.Equal(t, "/tmp/work-notice", config.NoticeDirPath())
+	assert.Equal(t, "/tmp/work/.notice", config.NoticeDirPath())
 }
 
 func TestNoticeWorkPath(t *testing.T) {
 	config := Config{Path: "/tmp/work"}
-	assert.Equal(t, "/tmp/work-notice-work", config.NoticeWorkPath())
+	assert.Equal(t, "/tmp/work/.notice-work", config.NoticeWorkPath())
 }
 
 func TestNoticeFilePath(t *testing.T) {
 	config := Config{Path: "/tmp/work"}
 	assert.Equal(t, "/tmp/work/NOTICE.txt", config.NoticeFilePath())
 }
-func TestRepoType(t *testing.T) {
-	jsconfig := Config{Search: []string{"", "package.json"}}
-	goconfig := Config{Search: []string{"", "go.mod"}}
+func TestRepoFiles(t *testing.T) {
+	path, _ := filepath.Abs(".")
+	jsconfig := Config{Search: []string{"", "package.json"}, Path: path}
+	goconfig := Config{Search: []string{"", "go.mod"}, Path: path}
 	pythonconfig := Config{Search: []string{"", "Pipfile"}}
-	jsconfig.determineRepoType()
-	goconfig.determineRepoType()
-	pythonconfig.determineRepoType()
-	assert.Equal(t, JsRepo, jsconfig.RepoType)
-	assert.Equal(t, GoRepo, goconfig.RepoType)
-	assert.Equal(t, PythonRepo, pythonconfig.RepoType)
+	jsconfig.determineRepoFiles()
+	goconfig.determineRepoFiles()
+	pythonconfig.determineRepoFiles()
+	assert.Equal(t, []string{filepath.Join(jsconfig.Path, "package.json")}, jsconfig.JSFIles)
+	assert.Equal(t, []string{filepath.Join(goconfig.Path, "go.mod")}, goconfig.GoFiles)
 }
 
 func TestNewConfig(t *testing.T) {
