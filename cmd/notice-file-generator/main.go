@@ -84,6 +84,7 @@ func main() {
 
 		}()
 	}
+	wg.Wait()
 
 	if err = UpdateNotice(config, dependencies); err != nil {
 		log.Fatalf("Error occured while updating notice.txt %s:%v", config.Name, err)
