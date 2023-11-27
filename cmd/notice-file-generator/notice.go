@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -125,8 +126,8 @@ func SplitExistingNotice(config *Config) error {
 }
 
 func MoveExistingNotice(config *Config, filename string) error {
-	oldLocation := fmt.Sprintf("%s/%s", config.NoticeDirPath(), filename)
-	newLocation := fmt.Sprintf("%s/%s", config.NoticeWorkPath(), filename)
+	oldLocation := filepath.Join(config.NoticeDirPath(), filename)
+	newLocation := filepath.Join(config.NoticeWorkPath(), filename)
 	err := os.Rename(oldLocation, newLocation)
 	if err != nil {
 		return err

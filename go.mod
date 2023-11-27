@@ -1,9 +1,8 @@
 module github.com/mattermost/notice-file-generator
 
-go 1.18
+go 1.21.4
 
 require (
-	github.com/bmatcuk/doublestar v1.3.4
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/stretchr/testify v1.7.2
 	golang.org/x/mod v0.5.1

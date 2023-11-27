@@ -1,7 +1,7 @@
 # This dockerfile is used to build Mattermost notice-filep-generator
 # A multi stage build, with golang used as a builder
 # and gcr.io/distroless/static as runner
-ARG GO_IMAGE=golang:1.18.3@sha256:b203dc573d81da7b3176264bfa447bd7c10c9347689be40540381838d75eebef
+ARG GO_IMAGE=golang:1.21.4
 # hadolint ignore=DL3006
 FROM ${GO_IMAGE} as builder
 
