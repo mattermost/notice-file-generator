@@ -1,11 +1,11 @@
 module github.com/mattermost/notice-file-generator
 
-go 1.21.4
+go 1.21.8
 
 require (
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/stretchr/testify v1.7.2
-	golang.org/x/mod v0.5.1
+	golang.org/x/mod v0.17.0
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
 	gopkg.in/yaml.v3 v3.0.1
 )
