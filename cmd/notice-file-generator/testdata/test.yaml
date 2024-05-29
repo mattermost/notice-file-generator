@@ -7,9 +7,6 @@ reviewers:
   - reviewerOne
 search:
   - "package.json"
-dependencies:
-  - "wix"
-devDependencies: 
-  - "webpack"
-
+additionalDependencies:
+  - wix
 ...

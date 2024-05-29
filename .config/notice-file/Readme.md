@@ -13,8 +13,8 @@ copyright: "©2022 Mattermost, Inc.  All Rights Reserved.  See LICENSE.txt for l
 description: "This document includes a list of open source components used in Mattermost Motice File Generator, including those that have been modified."
 search:
   - "go.mod"
-dependencies: []
-devDependencies: []
+additionalDependencies:
+  - wix
 ```
 
 | Field                  | Type    | Purpose                                                                                                                  |
@@ -23,4 +23,5 @@ devDependencies: []
 | copyright              | string  | Field content will be used as a copyright message. See second line of `NOTICE.txt` file.                                 |
 | description            | string  | Field content will be used as notice file description. See third line of `NOTICE.txt` file.                              |
 | includeDevDependencies | boolean | If true we include devDependency section of all package.json files declared.                                             |
+| additionalDependencies | array   | Optional additional dependencies. Their stanzas in the `NOTICE.txt` file should be added manually.                       |
 | search                 | array   | Pipeline will search for package.json files mentioned here. Globstar format is supported ie. `packages/**/package.json`. |
