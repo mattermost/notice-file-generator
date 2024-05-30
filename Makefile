@@ -433,7 +433,7 @@ github-release: ## to publish a release and relevant artifacts to GitHub
 ifeq ($(shell echo $(APP_VERSION) | egrep '^v([0-9]+\.){0,2}(\*|[0-9]+)'),)
 	$(error "We only support releases from semver tags")
 else
-	$(AT)gh release create $(APP_VERSION) --generate-notes $(GO_OUT_BIN_DIR)/*" || ${FAIL}
+	$(AT)gh release create $(APP_VERSION) --generate-notes $(GO_OUT_BIN_DIR)/* || ${FAIL}
 endif
 	@$(OK) Generating github-release http://github.com/$(GITHUB_ORG)/$(GITHUB_REPO)/releases/tag/$(APP_VERSION) ...
 
