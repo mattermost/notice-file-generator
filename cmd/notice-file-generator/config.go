@@ -18,6 +18,7 @@ type Config struct {
 	Reviewers              []string `yaml:"reviewers"`
 	Search                 []string `yaml:"search"`
 	IncludeDevDependencies bool     `yaml:"includeDevDependencies"`
+	AdditionalDependencies []string `yaml:"additionalDependencies"`
 	Name                   string   `yaml:"-"`
 	Path                   string   `yaml:"-"`
 	GHToken                string   `yaml:"-"`

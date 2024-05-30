@@ -19,7 +19,9 @@ import (
 type DependencyType int
 
 const (
-	JsDep DependencyType = iota
+	// The default DependencyType is unspecified
+	_ DependencyType = iota
+	JsDep
 	GoDep
 )
 
@@ -205,6 +207,8 @@ func (d *Dependency) Generate(config *Config) error {
 				log.Printf("GitHub load failed  %s", d.Name)
 				return err
 			}
+		default:
+			return fmt.Errorf("unsupported dependency type for %s. Please add the notice stanza manually, before running this program", d.Name)
 		}
 
 		var out *os.File
@@ -411,6 +415,8 @@ func PopulateDependencies(config *Config) ([]Dependency, error) {
 		}
 		allDeps = append(allDeps, d...)
 	}
-
+	for _, dep := range config.AdditionalDependencies {
+		allDeps = append(allDeps, Dependency{Name: dep})
+	}
 	return allDeps, nil
 }

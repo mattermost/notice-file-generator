@@ -79,7 +79,7 @@ func main() {
 			defer wg.Done()
 
 			if err = d.Generate(config); err != nil {
-				log.Printf("Error occured while generating notice.txt %s:%v", d.Name, err)
+				log.Fatalf("Error occured while generating notice.txt %s:%v", d.Name, err)
 			}
 
 		}()
