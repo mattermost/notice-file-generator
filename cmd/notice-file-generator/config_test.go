@@ -52,4 +52,6 @@ func TestNewConfig(t *testing.T) {
 	assert.Equal(t, "ignored", config.AdditionalDependencies[1])
 	assert.Equal(t, 1, len(config.IgnoreDependencies))
 	assert.Equal(t, "ignored", config.IgnoreDependencies[0])
+
+	os.Args = os.Args[:len(os.Args)-3]
 }

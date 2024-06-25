@@ -51,4 +51,6 @@ func TestIgnoreDependencies(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(allDeps))
 	assert.Equal(t, "wix", allDeps[0].Name)
+
+	os.Args = os.Args[:len(os.Args)-3]
 }
