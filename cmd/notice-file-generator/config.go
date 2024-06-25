@@ -19,6 +19,7 @@ type Config struct {
 	Search                 []string `yaml:"search"`
 	IncludeDevDependencies bool     `yaml:"includeDevDependencies"`
 	AdditionalDependencies []string `yaml:"additionalDependencies"`
+	IgnoreDependencies     []string `yaml:"ignoreDependencies"`
 	Name                   string   `yaml:"-"`
 	Path                   string   `yaml:"-"`
 	GHToken                string   `yaml:"-"`
