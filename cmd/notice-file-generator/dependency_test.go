@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,4 +41,16 @@ func TestPopulateLicenseByUrl(t *testing.T) {
 	license := dep.PopulateLicence()
 
 	assert.NotEmpty(t, license)
+}
+
+func TestIgnoreDependencies(t *testing.T) {
+	os.Args = append(os.Args, "-p=/tmp/test", "-t=token", "-c=testdata/dependency_test.yaml")
+
+	config := newConfig()
+	allDeps, err := PopulateDependencies(config)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(allDeps))
+	assert.Equal(t, "wix", allDeps[0].Name)
+
+	os.Args = os.Args[:len(os.Args)-3]
 }

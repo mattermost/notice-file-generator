@@ -397,6 +397,23 @@ func (c *Config) PopulateGoDependencies(goModFile string) ([]Dependency, error) 
 	return goDependencies.value, nil
 }
 
+func RemoveIgnoredDependencies(allDeps []Dependency, depsToIgnore []string) []Dependency {
+	var filteredDeps []Dependency
+	for i := 0; i < len(allDeps); i++ {
+		for _, dep := range depsToIgnore {
+			if allDeps[i].Name == dep {
+				allDeps[i].Name = ""
+			}
+		}
+	}
+	for _, dep := range allDeps {
+		if dep.Name != "" {
+			filteredDeps = append(filteredDeps, dep)
+		}
+	}
+	return filteredDeps
+}
+
 func PopulateDependencies(config *Config) ([]Dependency, error) {
 	var allDeps []Dependency
 
@@ -418,5 +435,6 @@ func PopulateDependencies(config *Config) ([]Dependency, error) {
 	for _, dep := range config.AdditionalDependencies {
 		allDeps = append(allDeps, Dependency{Name: dep})
 	}
+	allDeps = RemoveIgnoredDependencies(allDeps, config.IgnoreDependencies)
 	return allDeps, nil
 }

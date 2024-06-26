@@ -47,6 +47,11 @@ func TestNewConfig(t *testing.T) {
 	assert.Equal(t, "reviewerOne", config.Reviewers[0])
 	assert.Equal(t, 1, len(config.Search))
 	assert.Equal(t, "package.json", config.Search[0])
-	assert.Equal(t, 1, len(config.AdditionalDependencies))
+	assert.Equal(t, 2, len(config.AdditionalDependencies))
 	assert.Equal(t, "wix", config.AdditionalDependencies[0])
+	assert.Equal(t, "ignored", config.AdditionalDependencies[1])
+	assert.Equal(t, 1, len(config.IgnoreDependencies))
+	assert.Equal(t, "ignored", config.IgnoreDependencies[0])
+
+	os.Args = os.Args[:len(os.Args)-3]
 }
