@@ -68,6 +68,7 @@ func TestNpmPackageNameRejectsInvalidAlias(t *testing.T) {
 		"npm:",
 		"npm:../../evil@1.0.0",
 		"npm:pkg?x=1@1.0.0",
+		"npm:pkg#frag@1.0.0",
 		"npm:Upper@1.0.0",
 		"npm:@scope@1.0.0",
 		"npm:.hidden@1.0.0",
@@ -89,6 +90,22 @@ func TestPopulateJSDependenciesResolvesAliases(t *testing.T) {
 		names = append(names, d.Name)
 	}
 	assert.ElementsMatch(t, []string{"typescript", "@typescript/typescript6", "react", "@mattermost/commonmark"}, names)
+}
+
+func TestPopulateDependenciesDeduplicatesAliasTargets(t *testing.T) {
+	config := &Config{JSFIles: []string{
+		"testdata/npm-alias-duplicate/package.json",
+		"testdata/npm-alias/package.json",
+	}}
+
+	deps, err := PopulateDependencies(config)
+	assert.NoError(t, err)
+
+	var names []string
+	for _, d := range deps {
+		names = append(names, d.Name)
+	}
+	assert.ElementsMatch(t, []string{"react", "typescript", "@typescript/typescript6"}, names)
 }
 
 func TestIgnoreDependencies(t *testing.T) {

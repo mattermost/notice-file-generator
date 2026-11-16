@@ -459,5 +459,19 @@ func PopulateDependencies(config *Config) ([]Dependency, error) {
 		allDeps = append(allDeps, Dependency{Name: dep})
 	}
 	allDeps = RemoveIgnoredDependencies(allDeps, config.IgnoreDependencies)
-	return allDeps, nil
+	return uniqueDependencies(allDeps), nil
+}
+
+// uniqueDependencies keeps the first dependency per name. Each name maps to one
+// stanza file, so duplicates would be generated concurrently and clobber each other.
+func uniqueDependencies(deps []Dependency) []Dependency {
+	seen := make(map[string]bool, len(deps))
+	var unique []Dependency
+	for _, d := range deps {
+		if !seen[d.Name] {
+			seen[d.Name] = true
+			unique = append(unique, d)
+		}
+	}
+	return unique
 }
