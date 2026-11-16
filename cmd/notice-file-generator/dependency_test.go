@@ -52,7 +52,6 @@ func TestNpmPackageName(t *testing.T) {
 		{"typescript", "npm:@typescript/typescript6@6.0.2", "@typescript/typescript6"},
 		{"local", "npm:pkg", "pkg"},
 		{"local", "npm:@scope/pkg", "@scope/pkg"},
-		{"local", "npm:", "local"},
 		{"react", "19.3.1", "react"},
 		{"marked", "github:mattermost/marked#467bc9e", "marked"},
 		{"@mattermost/rnutils", "file:./libraries/@mattermost/rnutils", "@mattermost/rnutils"},
@@ -66,6 +65,7 @@ func TestNpmPackageName(t *testing.T) {
 
 func TestNpmPackageNameRejectsInvalidAlias(t *testing.T) {
 	for _, spec := range []string{
+		"npm:",
 		"npm:../../evil@1.0.0",
 		"npm:pkg?x=1@1.0.0",
 		"npm:Upper@1.0.0",

@@ -303,7 +303,7 @@ var regexpNpmPackageName = regexp.MustCompile(`^(@[a-z0-9~-][a-z0-9._~-]*/)?[a-z
 // e.g. "@typescript/native": "npm:typescript@7.0.2" resolves to "typescript".
 func npmPackageName(name, spec string) (string, error) {
 	target, ok := strings.CutPrefix(spec, "npm:")
-	if !ok || target == "" {
+	if !ok {
 		return name, nil
 	}
 	if i := strings.LastIndex(target, "@"); i > 0 {
