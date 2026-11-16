@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,6 +42,53 @@ func TestPopulateLicenseByUrl(t *testing.T) {
 	license := dep.PopulateLicence()
 
 	assert.NotEmpty(t, license)
+}
+
+func TestNpmPackageName(t *testing.T) {
+	tests := []struct {
+		name, spec, want string
+	}{
+		{"@typescript/native", "npm:typescript@7.0.2", "typescript"},
+		{"typescript", "npm:@typescript/typescript6@6.0.2", "@typescript/typescript6"},
+		{"local", "npm:pkg", "pkg"},
+		{"local", "npm:@scope/pkg", "@scope/pkg"},
+		{"local", "npm:", "local"},
+		{"react", "19.3.1", "react"},
+		{"marked", "github:mattermost/marked#467bc9e", "marked"},
+		{"@mattermost/rnutils", "file:./libraries/@mattermost/rnutils", "@mattermost/rnutils"},
+	}
+	for _, tt := range tests {
+		got, err := npmPackageName(tt.name, tt.spec)
+		assert.NoError(t, err, tt.spec)
+		assert.Equal(t, tt.want, got, tt.spec)
+	}
+}
+
+func TestNpmPackageNameRejectsInvalidAlias(t *testing.T) {
+	for _, spec := range []string{
+		"npm:../../evil@1.0.0",
+		"npm:pkg?x=1@1.0.0",
+		"npm:Upper@1.0.0",
+		"npm:@scope@1.0.0",
+		"npm:.hidden@1.0.0",
+		"npm:" + strings.Repeat("a", 215),
+	} {
+		_, err := npmPackageName("local", spec)
+		assert.Error(t, err, spec)
+	}
+}
+
+func TestPopulateJSDependenciesResolvesAliases(t *testing.T) {
+	config := &Config{IncludeDevDependencies: true}
+
+	deps, err := config.PopulateJSDependencies("testdata/npm-alias/package.json")
+	assert.NoError(t, err)
+
+	var names []string
+	for _, d := range deps {
+		names = append(names, d.Name)
+	}
+	assert.ElementsMatch(t, []string{"typescript", "@typescript/typescript6", "react", "@mattermost/commonmark"}, names)
 }
 
 func TestIgnoreDependencies(t *testing.T) {

@@ -279,17 +279,42 @@ func (c *Config) PopulateJSDependencies(packageJSON string) ([]Dependency, error
 
 	var npmDependencies Dependencies
 
-	for dependency := range npmPack.Dependencies {
-		npmDependencies.append(Dependency{Name: dependency, DependencyType: JsDep})
+	sections := []map[string]string{npmPack.Dependencies}
+	if c.IncludeDevDependencies {
+		sections = append(sections, npmPack.DevDependencies)
 	}
 
-	if c.IncludeDevDependencies {
-		for dependency := range npmPack.DevDependencies {
-			npmDependencies.append(Dependency{Name: dependency, DependencyType: JsDep})
+	for _, section := range sections {
+		for name, spec := range section {
+			pkg, err := npmPackageName(name, spec)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", packageJSON, err)
+			}
+			npmDependencies.append(Dependency{Name: pkg, DependencyType: JsDep})
 		}
 	}
 
 	return npmDependencies.value, nil
+}
+
+// npm package name rules: lowercase, URL-safe, optionally scoped, at most 214 characters.
+var regexpNpmPackageName = regexp.MustCompile(`^(@[a-z0-9~-][a-z0-9._~-]*/)?[a-z0-9~-][a-z0-9._~-]*$`)
+
+// npmPackageName returns the registry package behind a package.json entry.
+// An npm alias ("local": "npm:real@1.0.0") installs "real", not "local".
+// e.g. "@typescript/native": "npm:typescript@7.0.2" resolves to "typescript".
+func npmPackageName(name, spec string) (string, error) {
+	target, ok := strings.CutPrefix(spec, "npm:")
+	if !ok || target == "" {
+		return name, nil
+	}
+	if i := strings.LastIndex(target, "@"); i > 0 {
+		target = target[:i]
+	}
+	if len(target) > 214 || !regexpNpmPackageName.MatchString(target) {
+		return "", fmt.Errorf("invalid npm alias for %q: %q", name, spec)
+	}
+	return target, nil
 }
 
 func parseGoImport(data string) (GoImport, bool) {
