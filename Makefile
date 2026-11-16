@@ -41,7 +41,7 @@ DOCKER_REGISTRY_REPO    ?= mattermost/${APP_NAME}-daily
 DOCKER_USER             ?= user
 DOCKER_PASSWORD         ?= password
 ## Docker Images
-DOCKER_IMAGE_GO         ?= "golang:1.21.8"
+DOCKER_IMAGE_GO         ?= "golang:1.27.4@sha256:fe517acaa580cc7915457080f850c37e618b3c1e750f98b58fc6429b605147a1"
 DOCKER_IMAGE_DOCKERLINT ?= "hadolint/hadolint:v2.9.2@sha256:d355bd7df747a0f124f3b5e7b21e9dafd0cb19732a276f901f0fdee243ec1f3b"
 DOCKER_IMAGE_COSIGN     ?= "bitnami/cosign:1.8.0@sha256:8c2c61c546258fffff18b47bb82a65af6142007306b737129a7bd5429d53629a"
 
@@ -58,7 +58,8 @@ COSIGN_PASSWORD         ?= password
 GO                           := $(shell which go)
 # Extract GO version from go.mod file
 GO_VERSION                   ?= $(shell grep -E '^go' go.mod | awk {'print $$2'})
-GOLINT_VERSION 							 ?= v1.55.2
+GOLINT_VERSION 							 ?= v2.15.0
+GOVULNCHECK_VERSION          ?= v1.9.0
 # LDFLAGS
 GO_LDFLAGS                   += -X "github.com/mattermost/${APP_NAME}/service.buildHash=$(APP_COMMIT)"
 GO_LDFLAGS                   += -X "github.com/mattermost/${APP_NAME}/service.buildVersion=$(APP_VERSION)"
@@ -164,6 +165,9 @@ lint: go-lint docker-lint ## to lint
 
 .PHONY: test
 test: go-test ## to test
+
+.PHONY: vulncheck
+vulncheck: go-vulncheck ## to check for known vulnerabilities
 
 
 .PHONY: patch minor major patch-rc minor-rc major-rc
@@ -390,6 +394,18 @@ go-test: ## to run tests
 	go test ${GO_TEST_OPTS} ./... " || ${FAIL}
 	@$(OK) testing
 
+.PHONY: go-vulncheck
+go-vulncheck: ## to check go code and dependencies for known vulnerabilities
+	@$(INFO) vulnerability checking...
+	$(AT)$(DOCKER) run ${DOCKER_OPTS} \
+	-v $(PWD):/app -w /app \
+	-e GOCACHE="/tmp" \
+	$(DOCKER_IMAGE_GO) \
+	/bin/sh -c \
+	"cd /app && \
+	go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./... " || ${FAIL}
+	@$(OK) vulnerability checking
+
 .PHONY: go-mod-check
 go-mod-check: ## to check go mod files consistency
 	@$(INFO) Checking go mod files consistency...
@@ -416,7 +432,7 @@ go-lint: ## to lint go code
 	${DOCKER_IMAGE_GO} \
 	/bin/sh -c \
 	"cd /app && \
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLINT_VERSION) && \
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLINT_VERSION) && \
 	golangci-lint run ./... " || ${FAIL}
 	@$(OK) App linting
 

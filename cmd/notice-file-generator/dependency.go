@@ -11,9 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v93/github"
 	"golang.org/x/mod/modfile"
-	"golang.org/x/oauth2"
 )
 
 type DependencyType int
@@ -144,18 +143,17 @@ func (d *Dependency) NpmLoad() error {
 
 func (d *Dependency) LoadFromGithub(config *Config) error {
 	if strings.Contains(d.Repository.URL, "github.com") {
-		var gh = github.NewClient(nil)
 		repoDef := strings.Split(d.Repository.URL, "/")
 		scope := repoDef[len(repoDef)-2]
 		repoName := strings.ReplaceAll(repoDef[len(repoDef)-1], ".git", "")
 
+		var opts []github.ClientOptionsFunc
 		if len(config.GHToken) != 0 {
-			ctx := context.Background()
-			ts := oauth2.StaticTokenSource(
-				&oauth2.Token{AccessToken: config.GHToken},
-			)
-			tc := oauth2.NewClient(ctx, ts)
-			gh = github.NewClient(tc)
+			opts = append(opts, github.WithAuthToken(config.GHToken))
+		}
+		gh, err := github.NewClient(opts...)
+		if err != nil {
+			return err
 		}
 
 		repo, _, err := gh.Repositories.Get(context.Background(), scope, repoName)
