@@ -409,7 +409,13 @@ go-vulncheck: ## to check go code and dependencies for known vulnerabilities
 .PHONY: go-mod-check
 go-mod-check: ## to check go mod files consistency
 	@$(INFO) Checking go mod files consistency...
-	$(AT)$(GO) mod tidy
+	$(AT)$(DOCKER) run ${DOCKER_OPTS} \
+	-v $(PWD):/app -w /app \
+	-e GOCACHE="/tmp" \
+	$(DOCKER_IMAGE_GO) \
+	/bin/sh -c \
+	"cd /app && \
+	go mod tidy" || ${FAIL}
 	$(AT)git --no-pager diff --exit-code go.mod go.sum || \
 	(${WARN} Please run "go mod tidy" and commit the changes in go.mod and go.sum. && ${FAIL} ; exit 128 )
 	@$(OK) Checking go mod files consistency
