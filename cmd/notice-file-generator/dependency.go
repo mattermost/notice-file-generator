@@ -368,7 +368,7 @@ func (c *Config) PopulateGoDependencies(goModFile string) ([]Dependency, error) 
 		DependencyType: GoDep,
 		Repository: DependencyRepository{
 			Type: "git",
-			URL:  "github.com/golang/go",
+			URL:  "https://github.com/golang/go",
 		},
 	})
 	o, e := os.ReadFile(goModFile)

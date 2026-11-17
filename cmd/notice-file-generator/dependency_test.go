@@ -73,6 +73,16 @@ func TestGithubRepo(t *testing.T) {
 	}
 }
 
+func TestBuiltinGoDependencyIsGithubRepo(t *testing.T) {
+	deps, err := (&Config{}).PopulateGoDependencies("testdata/go-builtin/go.mod")
+	assert.NoError(t, err)
+	assert.Len(t, deps, 1)
+
+	owner, repo, ok := githubRepo(deps[0].Repository.URL)
+	assert.True(t, ok)
+	assert.Equal(t, "golang/go", owner+"/"+repo)
+}
+
 func TestStanzaSeparatorRemoved(t *testing.T) {
 	licence := "MIT\n\n---\n\nBSD\r\n---\r\nkeep --- inline\n----\n"
 
