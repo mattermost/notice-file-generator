@@ -44,6 +44,53 @@ func TestPopulateLicenseByUrl(t *testing.T) {
 	assert.NotEmpty(t, license)
 }
 
+func TestGithubRepo(t *testing.T) {
+	tests := map[string]string{
+		"git+https://github.com/mattermost/commonmark.js.git": "mattermost/commonmark.js",
+		"https://github.com/loafoe/mattermost-client#readme":  "loafoe/mattermost-client",
+		"git@github.com:google/renameio.git":                  "google/renameio",
+		"https://www.github.com/owner/foo.github.io":          "owner/foo.github.io",
+		"https://github.com/owner/repo/tree/main/packages/x":  "owner/repo",
+		"https://github.com:443/mattermost/commonmark.js":     "mattermost/commonmark.js",
+		"ssh://git@github.com/owner/repo.git":                 "owner/repo",
+		"https://example.org/github.com/mattermost/repo":      "",
+		"https://github.com.evil.org/owner/repo":              "",
+		"https://evilgithub.com/owner/repo":                   "",
+		"https://github.com/../repo":                          "",
+		"https://github.com/owner/..":                         "",
+		"https://github.com/owner/.git":                       "",
+		"https://github.com/owner":                            "",
+		"https://commonmark.org":                              "",
+		"":                                                    "",
+	}
+	for url, want := range tests {
+		owner, repo, ok := githubRepo(url)
+		got := ""
+		if ok {
+			got = owner + "/" + repo
+		}
+		assert.Equal(t, want, got, url)
+	}
+}
+
+func TestBuiltinGoDependencyIsGithubRepo(t *testing.T) {
+	deps, err := (&Config{}).PopulateGoDependencies("testdata/go-builtin/go.mod")
+	assert.NoError(t, err)
+	assert.Len(t, deps, 1)
+
+	owner, repo, ok := githubRepo(deps[0].Repository.URL)
+	assert.True(t, ok)
+	assert.Equal(t, "golang/go", owner+"/"+repo)
+}
+
+func TestStanzaSeparatorRemoved(t *testing.T) {
+	licence := "MIT\n\n---\n\nBSD\r\n---\r\nkeep --- inline\n----\n"
+
+	got := regexpStanzaSeparator.ReplaceAllString(licence, "")
+
+	assert.Equal(t, "MIT\n\n\n\nBSD\r\n\nkeep --- inline\n----\n", got)
+}
+
 func TestNpmPackageName(t *testing.T) {
 	tests := []struct {
 		name, spec, want string
