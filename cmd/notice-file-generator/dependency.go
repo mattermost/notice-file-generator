@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -100,21 +101,34 @@ func (d *Dependency) PopulateLicence() string {
 }
 
 var (
-	regexpGithubRepo = regexp.MustCompile(`(?:^|[^\w-])github\.com[/:]([\w.-]+)/([\w.-]+)`)
+	// SCP-style SSH, e.g. git@github.com:owner/repo.git. It has no port, so the colon is always the path separator.
+	regexpGithubSCP  = regexp.MustCompile(`^[\w.-]+@github\.com:(.+)$`)
+	regexpGithubName = regexp.MustCompile(`^[\w.-]+$`)
 	// A "---" line ends a stanza when NOTICE.txt is read back, so it cannot appear in licence text.
 	regexpStanzaSeparator = regexp.MustCompile(`(?m)^---\r?$`)
 )
 
 // githubRepo returns the owner and repository from a GitHub URL such as
-// git+https://github.com/mattermost/commonmark.js.git. ok is false if url is not a GitHub repository.
-func githubRepo(url string) (owner, repo string, ok bool) {
-	m := regexpGithubRepo.FindStringSubmatch(url)
-	if m == nil {
+// git+https://github.com/mattermost/commonmark.js.git. ok is false if rawURL is not a GitHub repository.
+func githubRepo(rawURL string) (owner, repo string, ok bool) {
+	var path string
+	if m := regexpGithubSCP.FindStringSubmatch(rawURL); m != nil {
+		path = m[1]
+	} else {
+		u, err := url.Parse(strings.TrimPrefix(rawURL, "git+"))
+		if err != nil || (u.Hostname() != "github.com" && u.Hostname() != "www.github.com") {
+			return "", "", false
+		}
+		path = u.Path
+	}
+
+	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	if len(parts) < 2 {
 		return "", "", false
 	}
-	owner, repo = m[1], strings.TrimSuffix(m[2], ".git")
+	owner, repo = parts[0], strings.TrimSuffix(parts[1], ".git")
 	for _, s := range []string{owner, repo} {
-		if s == "" || s == "." || s == ".." {
+		if s == "." || s == ".." || !regexpGithubName.MatchString(s) {
 			return "", "", false
 		}
 	}
