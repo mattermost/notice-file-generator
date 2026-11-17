@@ -44,18 +44,37 @@ func TestPopulateLicenseByUrl(t *testing.T) {
 	assert.NotEmpty(t, license)
 }
 
-func TestGithubRepoPath(t *testing.T) {
+func TestGithubRepo(t *testing.T) {
 	tests := map[string]string{
 		"git+https://github.com/mattermost/commonmark.js.git": "mattermost/commonmark.js",
 		"https://github.com/loafoe/mattermost-client#readme":  "loafoe/mattermost-client",
 		"git@github.com:google/renameio.git":                  "google/renameio",
+		"https://www.github.com/owner/foo.github.io":          "owner/foo.github.io",
 		"https://github.com/owner/repo/tree/main/packages/x":  "owner/repo",
+		"https://evilgithub.com/owner/repo":                   "",
+		"https://github.com/../repo":                          "",
+		"https://github.com/owner/..":                         "",
+		"https://github.com/owner/.git":                       "",
+		"https://github.com/owner":                            "",
 		"https://commonmark.org":                              "",
 		"":                                                    "",
 	}
 	for url, want := range tests {
-		assert.Equal(t, want, githubRepoPath(url), url)
+		owner, repo, ok := githubRepo(url)
+		got := ""
+		if ok {
+			got = owner + "/" + repo
+		}
+		assert.Equal(t, want, got, url)
 	}
+}
+
+func TestStanzaSeparatorRemoved(t *testing.T) {
+	licence := "MIT\n\n---\n\nBSD\r\n---\r\nkeep --- inline\n----\n"
+
+	got := regexpStanzaSeparator.ReplaceAllString(licence, "")
+
+	assert.Equal(t, "MIT\n\n\n\nBSD\r\n\nkeep --- inline\n----\n", got)
 }
 
 func TestPopulateLicenseRepoNameWithDot(t *testing.T) {

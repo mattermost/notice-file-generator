@@ -83,7 +83,8 @@ func (d *Dependency) PopulateLicence() string {
 	} else if d.Repository.URL != "" {
 		url = d.Repository.URL
 	}
-	if prefix := githubRepoPath(url); prefix != "" {
+	if owner, repo, ok := githubRepo(url); ok {
+		prefix := owner + "/" + repo
 		data, err := HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE.txt")
 		if err != nil {
 			data, err = HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE.md")
@@ -99,19 +100,25 @@ func (d *Dependency) PopulateLicence() string {
 }
 
 var (
-	regexpGithubRepo = regexp.MustCompile(`github\.com[/:]([\w.-]+)/([\w.-]+)`)
+	regexpGithubRepo = regexp.MustCompile(`(?:^|[^\w-])github\.com[/:]([\w.-]+)/([\w.-]+)`)
 	// A "---" line ends a stanza when NOTICE.txt is read back, so it cannot appear in licence text.
 	regexpStanzaSeparator = regexp.MustCompile(`(?m)^---\r?$`)
 )
 
-// githubRepoPath returns "owner/repo" from a GitHub URL such as
-// git+https://github.com/mattermost/commonmark.js.git, or "" if url is not on GitHub.
-func githubRepoPath(url string) string {
+// githubRepo returns the owner and repository from a GitHub URL such as
+// git+https://github.com/mattermost/commonmark.js.git. ok is false if url is not a GitHub repository.
+func githubRepo(url string) (owner, repo string, ok bool) {
 	m := regexpGithubRepo.FindStringSubmatch(url)
 	if m == nil {
-		return ""
+		return "", "", false
 	}
-	return m[1] + "/" + strings.TrimSuffix(m[2], ".git")
+	owner, repo = m[1], strings.TrimSuffix(m[2], ".git")
+	for _, s := range []string{owner, repo} {
+		if s == "" || s == "." || s == ".." {
+			return "", "", false
+		}
+	}
+	return owner, repo, true
 }
 
 func (d *Dependency) NpmLoad() error {
@@ -145,11 +152,7 @@ func (d *Dependency) NpmLoad() error {
 }
 
 func (d *Dependency) LoadFromGithub(config *Config) error {
-	if strings.Contains(d.Repository.URL, "github.com") {
-		repoDef := strings.Split(d.Repository.URL, "/")
-		scope := repoDef[len(repoDef)-2]
-		repoName := strings.ReplaceAll(repoDef[len(repoDef)-1], ".git", "")
-
+	if owner, repoName, ok := githubRepo(d.Repository.URL); ok {
 		var opts []github.ClientOptionsFunc
 		if len(config.GHToken) != 0 {
 			opts = append(opts, github.WithAuthToken(config.GHToken))
@@ -159,7 +162,7 @@ func (d *Dependency) LoadFromGithub(config *Config) error {
 			return err
 		}
 
-		repo, _, err := gh.Repositories.Get(context.Background(), scope, repoName)
+		repo, _, err := gh.Repositories.Get(context.Background(), owner, repoName)
 		if err != nil {
 			log.Printf("Github Load Failed  %v", err)
 			return err
@@ -187,6 +190,8 @@ func (d *Dependency) LoadFromGithub(config *Config) error {
 		} else {
 			log.Printf("There is no licence available for %s", d.Name)
 		}
+	} else if strings.Contains(d.Repository.URL, "github.com") {
+		return fmt.Errorf("invalid GitHub repository URL for %q: %q", d.Name, d.Repository.URL)
 	}
 	return nil
 }
