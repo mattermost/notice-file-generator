@@ -3,18 +3,47 @@ name: CI
 on:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: "Checkout Code"
-        uses: "actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b" #v3.0.2
+        uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+        with:
+          persist-credentials: false
       - name: "Execute Tests"
         run: make test
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: "Checkout Code"
-        uses: "actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b" #v3.0.2
+        uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+        with:
+          persist-credentials: false
       - name: "Lint"
         run: make lint
+  vulncheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: "Checkout Code"
+        uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "Check for known vulnerabilities"
+        run: make vulncheck
+  mod-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: "Checkout Code"
+        uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "Check go.mod and go.sum are tidy"
+        run: make go-mod-check

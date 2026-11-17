@@ -1,3 +1,5 @@
+// Command notice-file-generator builds a repository's NOTICE.txt from its
+// package.json and go.mod dependencies.
 package main
 
 import (

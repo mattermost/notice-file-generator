@@ -11,9 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v93/github"
 	"golang.org/x/mod/modfile"
-	"golang.org/x/oauth2"
 )
 
 type DependencyType int
@@ -144,18 +143,17 @@ func (d *Dependency) NpmLoad() error {
 
 func (d *Dependency) LoadFromGithub(config *Config) error {
 	if strings.Contains(d.Repository.URL, "github.com") {
-		var gh = github.NewClient(nil)
 		repoDef := strings.Split(d.Repository.URL, "/")
 		scope := repoDef[len(repoDef)-2]
 		repoName := strings.ReplaceAll(repoDef[len(repoDef)-1], ".git", "")
 
+		var opts []github.ClientOptionsFunc
 		if len(config.GHToken) != 0 {
-			ctx := context.Background()
-			ts := oauth2.StaticTokenSource(
-				&oauth2.Token{AccessToken: config.GHToken},
-			)
-			tc := oauth2.NewClient(ctx, ts)
-			gh = github.NewClient(tc)
+			opts = append(opts, github.WithAuthToken(config.GHToken))
+		}
+		gh, err := github.NewClient(opts...)
+		if err != nil {
+			return err
 		}
 
 		repo, _, err := gh.Repositories.Get(context.Background(), scope, repoName)
@@ -279,17 +277,42 @@ func (c *Config) PopulateJSDependencies(packageJSON string) ([]Dependency, error
 
 	var npmDependencies Dependencies
 
-	for dependency := range npmPack.Dependencies {
-		npmDependencies.append(Dependency{Name: dependency, DependencyType: JsDep})
+	sections := []map[string]string{npmPack.Dependencies}
+	if c.IncludeDevDependencies {
+		sections = append(sections, npmPack.DevDependencies)
 	}
 
-	if c.IncludeDevDependencies {
-		for dependency := range npmPack.DevDependencies {
-			npmDependencies.append(Dependency{Name: dependency, DependencyType: JsDep})
+	for _, section := range sections {
+		for name, spec := range section {
+			pkg, err := npmPackageName(name, spec)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", packageJSON, err)
+			}
+			npmDependencies.append(Dependency{Name: pkg, DependencyType: JsDep})
 		}
 	}
 
 	return npmDependencies.value, nil
+}
+
+// npm package name rules: lowercase, URL-safe, optionally scoped, at most 214 characters.
+var regexpNpmPackageName = regexp.MustCompile(`^(@[a-z0-9~-][a-z0-9._~-]*/)?[a-z0-9~-][a-z0-9._~-]*$`)
+
+// npmPackageName returns the registry package behind a package.json entry.
+// An npm alias ("local": "npm:real@1.0.0") installs "real", not "local".
+// e.g. "@typescript/native": "npm:typescript@7.0.2" resolves to "typescript".
+func npmPackageName(name, spec string) (string, error) {
+	target, ok := strings.CutPrefix(spec, "npm:")
+	if !ok {
+		return name, nil
+	}
+	if i := strings.LastIndex(target, "@"); i > 0 {
+		target = target[:i]
+	}
+	if len(target) > 214 || !regexpNpmPackageName.MatchString(target) {
+		return "", fmt.Errorf("invalid npm alias for %q: %q", name, spec)
+	}
+	return target, nil
 }
 
 func parseGoImport(data string) (GoImport, bool) {
@@ -436,5 +459,19 @@ func PopulateDependencies(config *Config) ([]Dependency, error) {
 		allDeps = append(allDeps, Dependency{Name: dep})
 	}
 	allDeps = RemoveIgnoredDependencies(allDeps, config.IgnoreDependencies)
-	return allDeps, nil
+	return uniqueDependencies(allDeps), nil
+}
+
+// uniqueDependencies keeps the first dependency per name. Each name maps to one
+// stanza file, so duplicates would be generated concurrently and clobber each other.
+func uniqueDependencies(deps []Dependency) []Dependency {
+	seen := make(map[string]bool, len(deps))
+	var unique []Dependency
+	for _, d := range deps {
+		if !seen[d.Name] {
+			seen[d.Name] = true
+			unique = append(unique, d)
+		}
+	}
+	return unique
 }
