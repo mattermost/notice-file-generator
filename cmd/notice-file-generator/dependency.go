@@ -83,32 +83,35 @@ func (d *Dependency) PopulateLicence() string {
 	} else if d.Repository.URL != "" {
 		url = d.Repository.URL
 	}
-	if url != "" {
-		prefix := ""
-		parts := strings.FieldsFunc(url, func(r rune) bool {
-			return r == '/' || r == '#' || r == '.'
-		})
-
-		for i := 0; i < len(parts); i++ {
-			if parts[i] == "com" && parts[i-1] == "github" {
-				prefix = fmt.Sprintf("%s/%s", parts[i+1], parts[i+2])
-				break
+	if prefix := githubRepoPath(url); prefix != "" {
+		data, err := HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE.txt")
+		if err != nil {
+			data, err = HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE.md")
+			if err != nil {
+				data, err = HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE")
 			}
 		}
-		if prefix != "" {
-			data, err := HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE.txt")
-			if err != nil {
-				data, err = HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE.md")
-				if err != nil {
-					data, err = HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE")
-				}
-			}
-			if err == nil {
-				content = data
-			}
+		if err == nil {
+			content = regexpStanzaSeparator.ReplaceAllString(data, "")
 		}
 	}
 	return fmt.Sprintf("%s\n\n", content)
+}
+
+var (
+	regexpGithubRepo = regexp.MustCompile(`github\.com[/:]([\w.-]+)/([\w.-]+)`)
+	// A "---" line ends a stanza when NOTICE.txt is read back, so it cannot appear in licence text.
+	regexpStanzaSeparator = regexp.MustCompile(`(?m)^---\r?$`)
+)
+
+// githubRepoPath returns "owner/repo" from a GitHub URL such as
+// git+https://github.com/mattermost/commonmark.js.git, or "" if url is not on GitHub.
+func githubRepoPath(url string) string {
+	m := regexpGithubRepo.FindStringSubmatch(url)
+	if m == nil {
+		return ""
+	}
+	return m[1] + "/" + strings.TrimSuffix(m[2], ".git")
 }
 
 func (d *Dependency) NpmLoad() error {

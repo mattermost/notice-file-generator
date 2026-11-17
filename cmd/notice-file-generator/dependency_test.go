@@ -44,6 +44,29 @@ func TestPopulateLicenseByUrl(t *testing.T) {
 	assert.NotEmpty(t, license)
 }
 
+func TestGithubRepoPath(t *testing.T) {
+	tests := map[string]string{
+		"git+https://github.com/mattermost/commonmark.js.git": "mattermost/commonmark.js",
+		"https://github.com/loafoe/mattermost-client#readme":  "loafoe/mattermost-client",
+		"git@github.com:google/renameio.git":                  "google/renameio",
+		"https://github.com/owner/repo/tree/main/packages/x":  "owner/repo",
+		"https://commonmark.org":                              "",
+		"":                                                    "",
+	}
+	for url, want := range tests {
+		assert.Equal(t, want, githubRepoPath(url), url)
+	}
+}
+
+func TestPopulateLicenseRepoNameWithDot(t *testing.T) {
+	dep := Dependency{Name: "@mattermost/commonmark", Repository: DependencyRepository{URL: "git+https://github.com/mattermost/commonmark.js.git"}}
+
+	license := dep.PopulateLicence()
+
+	assert.Contains(t, license, "Copyright (c) 2014, John MacFarlane")
+	assert.NotRegexp(t, `(?m)^---\r?$`, license)
+}
+
 func TestNpmPackageName(t *testing.T) {
 	tests := []struct {
 		name, spec, want string
