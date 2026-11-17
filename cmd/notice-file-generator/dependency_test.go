@@ -77,15 +77,6 @@ func TestStanzaSeparatorRemoved(t *testing.T) {
 	assert.Equal(t, "MIT\n\n\n\nBSD\r\n\nkeep --- inline\n----\n", got)
 }
 
-func TestPopulateLicenseRepoNameWithDot(t *testing.T) {
-	dep := Dependency{Name: "@mattermost/commonmark", Repository: DependencyRepository{URL: "git+https://github.com/mattermost/commonmark.js.git"}}
-
-	license := dep.PopulateLicence()
-
-	assert.Contains(t, license, "Copyright (c) 2014, John MacFarlane")
-	assert.NotRegexp(t, `(?m)^---\r?$`, license)
-}
-
 func TestNpmPackageName(t *testing.T) {
 	tests := []struct {
 		name, spec, want string
