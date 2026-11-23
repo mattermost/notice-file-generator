@@ -84,11 +84,11 @@ func TestBuiltinGoDependencyIsGithubRepo(t *testing.T) {
 }
 
 func TestSanitizeLicence(t *testing.T) {
-	licence := "## MIT License\n\nMIT\n\n---\n\nBSD\r\n---\r\nkeep --- inline\n----\n### Kept\nkeep ## inline\n"
+	licence := "## MIT License\n\nMIT\n\n---\n\nBSD\r\n---\r\nkeep --- inline\n----\n### Kept\nkeep ## inline\n## ---\n## ## Licence\n"
 
 	got := sanitizeLicence(licence)
 
-	assert.Equal(t, "MIT License\n\nMIT\n\n\n\nBSD\r\n\nkeep --- inline\n----\n### Kept\nkeep ## inline\n", got)
+	assert.Equal(t, " MIT License\n\nMIT\n\n\n\nBSD\r\n\nkeep --- inline\n----\n### Kept\nkeep ## inline\n ---\n ## Licence\n", got)
 }
 
 func TestNpmPackageName(t *testing.T) {

@@ -112,7 +112,8 @@ var (
 
 func sanitizeLicence(data string) string {
 	data = regexpStanzaSeparator.ReplaceAllString(data, "")
-	return regexpStanzaHeading.ReplaceAllString(data, "")
+	// A space rather than nothing, so "## ---" and "## ## x" do not become delimiters.
+	return regexpStanzaHeading.ReplaceAllString(data, " ")
 }
 
 // githubRepo returns the owner and repository from a GitHub URL such as
