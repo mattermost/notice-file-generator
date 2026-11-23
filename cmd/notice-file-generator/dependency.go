@@ -94,7 +94,7 @@ func (d *Dependency) PopulateLicence() string {
 			}
 		}
 		if err == nil {
-			content = regexpStanzaSeparator.ReplaceAllString(data, "")
+			content = sanitizeLicence(data)
 		}
 	}
 	return fmt.Sprintf("%s\n\n", content)
@@ -104,9 +104,16 @@ var (
 	// SCP-style SSH, e.g. git@github.com:owner/repo.git. It has no port, so the colon is always the path separator.
 	regexpGithubSCP  = regexp.MustCompile(`^[\w.-]+@github\.com:(.+)$`)
 	regexpGithubName = regexp.MustCompile(`^[\w.-]+$`)
-	// A "---" line ends a stanza when NOTICE.txt is read back, so it cannot appear in licence text.
+	// "---" ends a stanza and "## " starts a new one when NOTICE.txt is read back,
+	// so neither can appear in licence text.
 	regexpStanzaSeparator = regexp.MustCompile(`(?m)^---\r?$`)
+	regexpStanzaHeading   = regexp.MustCompile(`(?m)^## `)
 )
+
+func sanitizeLicence(data string) string {
+	data = regexpStanzaSeparator.ReplaceAllString(data, "")
+	return regexpStanzaHeading.ReplaceAllString(data, "")
+}
 
 // githubRepo returns the owner and repository from a GitHub URL such as
 // git+https://github.com/mattermost/commonmark.js.git. ok is false if rawURL is not a GitHub repository.

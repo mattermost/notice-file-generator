@@ -83,12 +83,12 @@ func TestBuiltinGoDependencyIsGithubRepo(t *testing.T) {
 	assert.Equal(t, "golang/go", owner+"/"+repo)
 }
 
-func TestStanzaSeparatorRemoved(t *testing.T) {
-	licence := "MIT\n\n---\n\nBSD\r\n---\r\nkeep --- inline\n----\n"
+func TestSanitizeLicence(t *testing.T) {
+	licence := "## MIT License\n\nMIT\n\n---\n\nBSD\r\n---\r\nkeep --- inline\n----\n### Kept\nkeep ## inline\n"
 
-	got := regexpStanzaSeparator.ReplaceAllString(licence, "")
+	got := sanitizeLicence(licence)
 
-	assert.Equal(t, "MIT\n\n\n\nBSD\r\n\nkeep --- inline\n----\n", got)
+	assert.Equal(t, "MIT License\n\nMIT\n\n\n\nBSD\r\n\nkeep --- inline\n----\n### Kept\nkeep ## inline\n", got)
 }
 
 func TestNpmPackageName(t *testing.T) {
