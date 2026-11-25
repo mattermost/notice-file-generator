@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -83,32 +84,63 @@ func (d *Dependency) PopulateLicence() string {
 	} else if d.Repository.URL != "" {
 		url = d.Repository.URL
 	}
-	if url != "" {
-		prefix := ""
-		parts := strings.FieldsFunc(url, func(r rune) bool {
-			return r == '/' || r == '#' || r == '.'
-		})
-
-		for i := 0; i < len(parts); i++ {
-			if parts[i] == "com" && parts[i-1] == "github" {
-				prefix = fmt.Sprintf("%s/%s", parts[i+1], parts[i+2])
-				break
+	if owner, repo, ok := githubRepo(url); ok {
+		prefix := owner + "/" + repo
+		data, err := HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE.txt")
+		if err != nil {
+			data, err = HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE.md")
+			if err != nil {
+				data, err = HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE")
 			}
 		}
-		if prefix != "" {
-			data, err := HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE.txt")
-			if err != nil {
-				data, err = HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE.md")
-				if err != nil {
-					data, err = HTTPGet("https://raw.githubusercontent.com/" + prefix + "/HEAD/LICENSE")
-				}
-			}
-			if err == nil {
-				content = data
-			}
+		if err == nil {
+			content = sanitizeLicence(data)
 		}
 	}
 	return fmt.Sprintf("%s\n\n", content)
+}
+
+var (
+	// SCP-style SSH, e.g. git@github.com:owner/repo.git. It has no port, so the colon is always the path separator.
+	regexpGithubSCP  = regexp.MustCompile(`^[\w.-]+@github\.com:(.+)$`)
+	regexpGithubName = regexp.MustCompile(`^[\w.-]+$`)
+	// "---" ends a stanza and "## " starts a new one when NOTICE.txt is read back,
+	// so neither can appear in licence text.
+	regexpStanzaSeparator = regexp.MustCompile(`(?m)^---\r?$`)
+	regexpStanzaHeading   = regexp.MustCompile(`(?m)^## `)
+)
+
+func sanitizeLicence(data string) string {
+	data = regexpStanzaSeparator.ReplaceAllString(data, "")
+	// A space rather than nothing, so "## ---" and "## ## x" do not become delimiters.
+	return regexpStanzaHeading.ReplaceAllString(data, " ")
+}
+
+// githubRepo returns the owner and repository from a GitHub URL such as
+// git+https://github.com/mattermost/commonmark.js.git. ok is false if rawURL is not a GitHub repository.
+func githubRepo(rawURL string) (owner, repo string, ok bool) {
+	var path string
+	if m := regexpGithubSCP.FindStringSubmatch(rawURL); m != nil {
+		path = m[1]
+	} else {
+		u, err := url.Parse(strings.TrimPrefix(rawURL, "git+"))
+		if err != nil || (u.Hostname() != "github.com" && u.Hostname() != "www.github.com") {
+			return "", "", false
+		}
+		path = u.Path
+	}
+
+	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	if len(parts) < 2 {
+		return "", "", false
+	}
+	owner, repo = parts[0], strings.TrimSuffix(parts[1], ".git")
+	for _, s := range []string{owner, repo} {
+		if s == "." || s == ".." || !regexpGithubName.MatchString(s) {
+			return "", "", false
+		}
+	}
+	return owner, repo, true
 }
 
 func (d *Dependency) NpmLoad() error {
@@ -142,11 +174,7 @@ func (d *Dependency) NpmLoad() error {
 }
 
 func (d *Dependency) LoadFromGithub(config *Config) error {
-	if strings.Contains(d.Repository.URL, "github.com") {
-		repoDef := strings.Split(d.Repository.URL, "/")
-		scope := repoDef[len(repoDef)-2]
-		repoName := strings.ReplaceAll(repoDef[len(repoDef)-1], ".git", "")
-
+	if owner, repoName, ok := githubRepo(d.Repository.URL); ok {
 		var opts []github.ClientOptionsFunc
 		if len(config.GHToken) != 0 {
 			opts = append(opts, github.WithAuthToken(config.GHToken))
@@ -156,7 +184,7 @@ func (d *Dependency) LoadFromGithub(config *Config) error {
 			return err
 		}
 
-		repo, _, err := gh.Repositories.Get(context.Background(), scope, repoName)
+		repo, _, err := gh.Repositories.Get(context.Background(), owner, repoName)
 		if err != nil {
 			log.Printf("Github Load Failed  %v", err)
 			return err
@@ -184,6 +212,8 @@ func (d *Dependency) LoadFromGithub(config *Config) error {
 		} else {
 			log.Printf("There is no licence available for %s", d.Name)
 		}
+	} else if strings.Contains(d.Repository.URL, "github.com") {
+		return fmt.Errorf("invalid GitHub repository URL for %q: %q", d.Name, d.Repository.URL)
 	}
 	return nil
 }
@@ -346,7 +376,7 @@ func (c *Config) PopulateGoDependencies(goModFile string) ([]Dependency, error) 
 		DependencyType: GoDep,
 		Repository: DependencyRepository{
 			Type: "git",
-			URL:  "github.com/golang/go",
+			URL:  "https://github.com/golang/go",
 		},
 	})
 	o, e := os.ReadFile(goModFile)
